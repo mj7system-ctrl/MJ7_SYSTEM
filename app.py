@@ -404,7 +404,7 @@ with tabs[4]:
                     st.error("Error: This load has already been settled.")
                 else:
                     # Guardamos el settlement en la nube
-                    new_settlement = [str(s_date), chosen_load, op_assigned, gross_revenue, owner_final, disp_fee, fact_fee, mj7_final]
+                    new_settlement = [str(l_date), chosen_load, op_assigned, gross_revenue, owner_final, disp_fee, fact_fee, mj7_final]
                     ws_settlements.append_row(new_settlement)
                     
                     # Actualizamos el estado de la carga
@@ -582,6 +582,7 @@ with tabs[6]:
     elif selected_scope == "Isolated Driver Analytical View":
         driver_uid_pick = st.selectbox("Select Target Driver Unique ID:", drivers["DRIVER_ID"].unique() if not drivers.empty else [])
         if st.button("Compile Driver Report") and driver_uid_pick:
+            st.write("Columnas disponibles:", settlements.columns.tolist())
             subset = settlements[settlements["DRIVER_ID"].astype(str) == str(driver_uid_pick)]
             if not subset.empty:
                 pdf_binary = compile_pdf_document(subset, f"Driver Analytical Ledger ({driver_uid_pick})", True, subset['MJ7_NET'].sum(), subset['OWNER_PAY'].sum())
