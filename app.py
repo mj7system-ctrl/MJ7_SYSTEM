@@ -241,7 +241,7 @@ with tabs[2]:
                     d_name = "Unknown Driver Name"
                 
                 # --------------------------------------------------
-                # ESTILO HTML CLEAN LOOK (Inline Styles que funcionan al 100%)
+                # ESTILO HTML CLEAN LOOK (Corregido usando tablas estables)
                 # --------------------------------------------------
                 card_html = f"""
                 <div style="
@@ -267,20 +267,22 @@ with tabs[2]:
                         <span style="color: #64748B; font-weight: 600;">NAME:</span> <span style="font-weight: 700; color: #0F172A;">{d_name}</span>
                     </div>
                     
-                    <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px;">
-                        <div style="background-color: #F8FAFC; border: 1px solid #E2E8F0; border-radius: 8px; padding: 14px; text-align: left;">
-                            <div style="font-size: 11px; text-transform: uppercase; color: #64748B; font-weight: 600; letter-spacing: 0.5px; margin-bottom: 4px;">Total Gross</div>
-                            <div style="font-size: 20px; color: #1E293B; font-weight: 700;">${drv_data['GROSS']:,.2f}</div>
-                        </div>
-                        <div style="background-color: #F8FAFC; border: 1px solid #E2E8F0; border-radius: 8px; padding: 14px; text-align: left;">
-                            <div style="font-size: 11px; text-transform: uppercase; color: #64748B; font-weight: 600; letter-spacing: 0.5px; margin-bottom: 4px;">Owner Pay</div>
-                            <div style="font-size: 20px; color: #1E293B; font-weight: 700;">${drv_data['OWNER_PAY']:,.2f}</div>
-                        </div>
-                        <div style="background-color: #EFF6FF; border: 1px solid #BFDBFE; border-radius: 8px; padding: 14px; text-align: left;">
-                            <div style="font-size: 11px; text-transform: uppercase; color: #1E40AF; font-weight: 600; letter-spacing: 0.5px; margin-bottom: 4px;">MJ7 Net Profit</div>
-                            <div style="font-size: 20px; color: #1D4ED8; font-weight: 700;">${drv_data['MJ7_NET']:,.2f}</div>
-                        </div>
-                    </div>
+                    <table style="width: 100%; border-collapse: separate; border-spacing: 16px 0; margin-left: -16px; margin-right: -16px; background-color: transparent;">
+                        <tr>
+                            <td style="width: 33.33%; background-color: #F8FAFC; border: 1px solid #E2E8F0; border-radius: 8px; padding: 14px; text-align: left; vertical-align: top;">
+                                <div style="font-size: 11px; text-transform: uppercase; color: #64748B; font-weight: 600; letter-spacing: 0.5px; margin-bottom: 4px;">Total Gross</div>
+                                <div style="font-size: 20px; color: #1E293B; font-weight: 700;">${drv_data['GROSS']:,.2f}</div>
+                            </td>
+                            <td style="width: 33.33%; background-color: #F8FAFC; border: 1px solid #E2E8F0; border-radius: 8px; padding: 14px; text-align: left; vertical-align: top;">
+                                <div style="font-size: 11px; text-transform: uppercase; color: #64748B; font-weight: 600; letter-spacing: 0.5px; margin-bottom: 4px;">Owner Pay</div>
+                                <div style="font-size: 20px; color: #1E293B; font-weight: 700;">${drv_data['OWNER_PAY']:,.2f}</div>
+                            </td>
+                            <td style="width: 33.33%; background-color: #EFF6FF; border: 1px solid #BFDBFE; border-radius: 8px; padding: 14px; text-align: left; vertical-align: top;">
+                                <div style="font-size: 11px; text-transform: uppercase; color: #1E40AF; font-weight: 600; letter-spacing: 0.5px; margin-bottom: 4px;">MJ7 Net Profit</div>
+                                <div style="font-size: 20px; color: #1D4ED8; font-weight: 700;">${drv_data['MJ7_NET']:,.2f}</div>
+                            </td>
+                        </tr>
+                    </table>
                 </div>
                 """
                 st.markdown(card_html, unsafe_allow_html=True)
@@ -290,18 +292,14 @@ with tabs[2]:
                 # --------------------------------------------------
                 def generate_single_card_image(driver_id, name_str, row_data):
                     img_w, img_h = 600, 260
-                    # Fondo blanco limpio y profesional
                     img = Image.new("RGB", (img_w, img_h), "#FFFFFF")
                     draw = ImageDraw.Draw(img)
                     
-                    # Delicado borde exterior para delimitar el tamaño de la tarjeta
                     draw.rectangle([0, 0, img_w-1, img_h-1], outline="#E2E8F0", width=1)
                     
-                    # Header Ejecutivo Limpio (Texto gris oscuro)
                     draw.text((25, 20), "MJ7 LOGISTICS CENTER — PERFORMANCE CARD", fill="#1E293B")
                     draw.text((25, 45), f"Date: {datetime.now().strftime('%Y-%m-%d')}", fill="#64748B")
                     
-                    # Pegar el logo en la esquina superior derecha
                     try:
                         logo_img = Image.open("logo.jpeg").convert("RGB")
                         logo_img = logo_img.resize((70, 35))
@@ -309,14 +307,11 @@ with tabs[2]:
                     except Exception:
                         pass
                         
-                    # Línea divisoria muy suave en gris claro
                     draw.line([(25, 75), (575, 75)], fill="#E2E8F0", width=1)
                     
-                    # Contenedor de Metadatos del Chofer (Fondo gris nube)
                     draw.rectangle([25, 90, 575, 125], fill="#F8FAFC")
                     draw.text((35, 100), f"DRIVER ID: {driver_id}   |   NAME: {name_str}", fill="#334155")
                     
-                    # --- GRID DE INDICADORES FINANCIEROS ---
                     # Caja 1: Total Gross
                     draw.rectangle([25, 145, 195, 230], fill="#F8FAFC", outline="#E2E8F0")
                     draw.text((35, 155), "TOTAL GROSS", fill="#64748B")
@@ -327,7 +322,7 @@ with tabs[2]:
                     draw.text((220, 155), "OWNER PAY", fill="#64748B")
                     draw.text((220, 185), f"${row_data['OWNER_PAY']:,.2f}", fill="#1E293B")
                     
-                    # Caja 3: MJ7 Net Profit (Resaltada en tonos azul claro/royal)
+                    # Caja 3: MJ7 Net Profit
                     draw.rectangle([400, 145, 575, 230], fill="#EFF6FF", outline="#BFDBFE")
                     draw.text((410, 155), "MJ7 NET PROFIT", fill="#1E40AF")
                     draw.text((410, 185), f"${row_data['MJ7_NET']:,.2f}", fill="#1D4ED8")
@@ -336,7 +331,6 @@ with tabs[2]:
                     img.save(buf, format="PNG")
                     return buf.getvalue()
                 
-                # Botón de descarga original intacto
                 single_img_data = generate_single_card_image(d_id, d_name, drv_data)
                 st.download_button(
                     label=f"📥 Download Card Image ({d_id})",
