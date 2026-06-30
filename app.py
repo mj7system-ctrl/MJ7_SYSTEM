@@ -366,10 +366,8 @@ with tabs[4]:
             if not l_num or not l_comp or l_driver == "Select Driver" or l_amt is None:
                 st.error("Error: Please complete all required fields.")
             else:
-                # CORRECCIÓN NUBE: append_row añade la fila al final de la hoja en Google Sheets
                 new_row = [l_num, l_comp, float(l_amt), str(l_sdate), str(l_edate), l_stat, l_orig, l_dest, l_driver]
                 get_ws("CARGAS").append_row(new_row)
-                
                 st.success("Done: Load registered successfully in the cloud.")
                 st.cache_data.clear()
 
@@ -395,53 +393,43 @@ with tabs[4]:
             owner_final = o_base - fuel_deductions - other_deductions
             
             if st.button("Authorize Settlement"):
-                # CORRECCIÓN NUBE: Check de liquidación usando la API
                 ws_settlements = get_ws("SETTLEMENTS")
-                # Buscamos en la columna "LOAD_NUMBER" (columna 2)
                 if chosen_load in ws_settlements.col_values(2):
-                st.error("Error: This load has already been settled.")
-            else:
-                # Guardamos el settlement en la nube
-                from datetime import date
-                l_date = date.today() 
-                
-                new_settlement = [
-                    str(l_date), 
-                    str(chosen_load), 
-                    str(op_assigned), 
-                    float(gross_revenue), 
-                    float(owner_final), 
-                    float(disp_fee), 
-                    float(fact_fee), 
-                    float(mj7_final)
-                ]
-                ws_settlements.append_row(new_settlement)
-                st.success("Settlement recorded successfully!")
-              
+                    st.error("Error: This load has already been settled.")
+                else:
+                    from datetime import date
+                    l_date = date.today() 
                     
-                    # Actualizamos el estado de la carga
+                    new_settlement = [
+                        str(l_date), 
+                        str(chosen_load), 
+                        str(op_assigned), 
+                        float(gross_revenue), 
+                        float(owner_final), 
+                        float(disp_fee), 
+                        float(fact_fee), 
+                        float(mj7_final)
+                    ]
+                    ws_settlements.append_row(new_settlement)
+                    
                     ws_loads = get_ws("CARGAS")
                     cell = ws_loads.find(chosen_load)
-                    ws_loads.update_cell(cell.row, 6, "CLOSED / SETTLED") # Columna 6 = STATUS
+                    ws_loads.update_cell(cell.row, 6, "CLOSED / SETTLED")
                     
                     st.success("Done: Settlement locked and saved in Cloud.")
                     st.cache_data.clear()
+
     elif flow == "Modify / Re-Settle Load":
         all_loads = ["Select Load"] + list(loads["LOAD"].astype(str).unique()) if not loads.empty else []
         edit_load_id = st.selectbox("Select the load you wish to modify or re-settle:", all_loads)
-        
         if edit_load_id and edit_load_id != "Select Load":
             load_filtered_df = loads[loads["LOAD"].astype(str).str.strip() == str(edit_load_id).strip()]
-            
             if not load_filtered_df.empty:
                 load_match = load_filtered_df.iloc[0]
-                
-                st.markdown("#### Current Load Data (Edit fields as necessary):")
                 e_comp = st.text_input("Broker / Client Name", value=load_match["COMPANY"])
                 e_amt = st.number_input("Gross Amount ($)", value=float(load_match["AMOUNT"]), format="%.2f")
                 e_stat = st.selectbox("Status", ["PENDING", "IN TRANSIT", "DELIVERED", "CLOSED / SETTLED"], index=["PENDING", "IN TRANSIT", "DELIVERED", "CLOSED / SETTLED"].index(load_match["STATUS"]))
                 e_driver = st.selectbox("Driver Assigned", list(drivers["DRIVER_ID"].astype(str).unique()), index=list(drivers["DRIVER_ID"].astype(str).unique()).index(str(load_match["DRIVER_ID"])))
-                
                 if st.button("Update and Re-Settle"):
                     ws_loads = get_ws("CARGAS")
                     cell = ws_loads.find(str(edit_load_id))
@@ -452,18 +440,14 @@ with tabs[4]:
                         ws_loads.update_cell(cell.row, 9, e_driver)
                         st.success("Done: Load modified in Cloud.")
                         st.cache_data.clear()
-                    else:
-                        st.error("Error: Load ID not found.")
             else:
                 st.error("Error: Could not retrieve load data.")
 
     elif flow == "Register Deduction":
         driver_pool = list(drivers["DRIVER_ID"].astype(str).unique()) if not drivers.empty else []
         selected_driver_context = st.selectbox("Filter by Driver:", ["Select Driver"] + driver_pool)
-        
         if selected_driver_context != "Select Driver":
             allowed_cargas = loads[loads["DRIVER_ID"].astype(str) == selected_driver_context]["LOAD"].astype(str).unique()
-            
             if len(allowed_cargas) > 0:
                 with st.form("deductions_entry_form", clear_on_submit=True):
                     g1, g2 = st.columns(2)
@@ -475,7 +459,6 @@ with tabs[4]:
                     with g2:
                         d_gal = st.number_input("Gallons", min_value=0.0, step=0.01) if d_clog == "FUEL" else 0.0
                         d_vcost = st.number_input("Total Amount ($)", min_value=0.0, step=1.00, format="%.2f")
-                        
                     if st.form_submit_button("Save Deduction"):
                         new_ded = [str(d_fdate), d_cload, selected_driver_context, d_clog, d_desc, float(d_gal), str(today), float(d_vcost)]
                         get_ws("DEDUCTIONS").append_row(new_ded)
@@ -491,7 +474,6 @@ with tabs[4]:
             with f2:
                 new_phone = st.text_input("Phone Number")
                 new_ops = st.selectbox("Operational Status", ["ACTIVE", "ON LEAVE", "INACTIVE"])
-                
             if st.form_submit_button("Save Driver"):
                 new_d = [new_id, new_name, new_phone, new_ops, str(today)]
                 get_ws("DRIVERS").append_row(new_d)
