@@ -280,7 +280,7 @@ with tabs[2]:
                     draw = ImageDraw.Draw(img)
                     
                     # Header Azul/Negro de la Tarjeta Imagen
-                    draw.rectangle([0, 0, img_w, 75], fill="#0F172A")
+                    draw.rectangle([0, 0, img_w, 75], fill="#1B2631")
                     draw.text((25, 18), "MJ7 LOGISTICS CENTER — PERFORMANCE CARD", fill="#38BDF8")
                     draw.text((25, 45), f"Date: {datetime.now().strftime('%Y-%m-%d')}", fill="#94A3B8")
                     
