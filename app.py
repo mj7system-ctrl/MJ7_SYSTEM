@@ -222,16 +222,16 @@ with tabs[2]:
         target_perf_drivers = st.multiselect("Select drivers to generate cards:", performance_matrix["DRIVER_ID"].unique())
         
         if target_perf_drivers:
-            # Importación de Base64 para inyectar el logo directo en la barra azul del HTML
             import base64
             try:
                 with open("logo.jpeg", "rb") as image_file:
                     encoded_logo = base64.b64encode(image_file.read()).decode()
-                logo_html_tag = f'<img src="data:image/jpeg;base64,{encoded_logo}" style="height: 40px; border-radius: 4px; border: 1px solid #334155;">'
+                # Logo con bordes limpios y sutiles
+                logo_html_tag = f'<img src="data:image/jpeg;base64,{encoded_logo}" style="height: 36px; border-radius: 4px; border: 1px solid #E2E8F0;">'
             except Exception:
                 logo_html_tag = ''
 
-            # Bucle Limpio: Genera una tarjeta única e independiente por cada chofer seleccionado
+            # Bucle: Genera una tarjeta limpia por cada chofer seleccionado
             for d_id in target_perf_drivers:
                 drv_data = performance_matrix[performance_matrix["DRIVER_ID"] == d_id].iloc[0]
                 
@@ -240,51 +240,68 @@ with tabs[2]:
                 except Exception:
                     d_name = "Unknown Driver Name"
                 
-                # Renderizado HTML limpio en pantalla en tonos grises oscuros y azul marino
+                # --------------------------------------------------
+                # ESTILO HTML CLEAN LOOK (Inyectamos estilos directo)
+                # --------------------------------------------------
                 card_html = f"""
-                <div class="performance-card-container">
-                    <div class="performance-card-header">
-                        <div class="performance-card-header-text">
-                            <h4>MJ7 LOGISTICS CENTER — PERFORMANCE CARD</h4>
-                            <span>Generated on: {datetime.now().strftime('%Y-%m-%d')}</span>
+                <div style="
+                    background-color: #FFFFFF; 
+                    border: 1px solid #E2E8F0; 
+                    border-radius: 12px; 
+                    padding: 24px; 
+                    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+                    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.03);
+                    margin-bottom: 12px;
+                ">
+                    <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #F1F5F9; padding-bottom: 16px; margin-bottom: 16px;">
+                        <div>
+                            <h4 style="margin: 0; color: #1E293B; font-size: 14px; letter-spacing: 0.5px; font-weight: 700;">MJ7 LOGISTICS CENTER</h4>
+                            <span style="font-size: 12px; color: #64748B;">Generated on: {datetime.now().strftime('%Y-%m-%d')}</span>
                         </div>
                         {logo_html_tag}
                     </div>
-                    <div class="performance-card-body">
-                        <div class="driver-meta-info">
-                            <strong style="color: #38BDF8;">DRIVER ID:</strong> {d_id} &nbsp;|&nbsp; <strong style="color: #38BDF8;">NAME:</strong> {d_name}
+                    
+                    <div style="background-color: #F8FAFC; border-radius: 6px; padding: 10px 14px; font-size: 13px; color: #334155; margin-bottom: 20px;">
+                        <span style="color: #64748B; font-weight: 600;">DRIVER ID:</span> <span style="font-weight: 700; color: #0F172A;">{d_id}</span> 
+                        <span style="color: #CBD5E1; margin: 0 10px;">|</span> 
+                        <span style="color: #64748B; font-weight: 600;">NAME:</span> <span style="font-weight: 700; color: #0F172A;">{d_name}</span>
+                    </div>
+                    
+                    <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px;">
+                        <div style="background-color: #F8FAFC; border: 1px solid #E2E8F0; border-radius: 8px; padding: 14px; text-align: left;">
+                            <div style="font-size: 11px; text-transform: uppercase; color: #64748B; font-weight: 600; letter-spacing: 0.5px; margin-bottom: 4px;">Total Gross</div>
+                            <div style="font-size: 20px; color: #1E293B; font-weight: 700;">${drv_data['GROSS']:,.2f}</div>
                         </div>
-                        <div class="performance-grid-layout">
-                            <div class="perf-item-box">
-                                <div class="perf-item-label">Total Gross</div>
-                                <div class="perf-item-value">${drv_data['GROSS']:,.2f}</div>
-                            </div>
-                            <div class="perf-item-box">
-                                <div class="perf-item-label">Owner Pay</div>
-                                <div class="perf-item-value">${drv_data['OWNER_PAY']:,.2f}</div>
-                            </div>
-                            <div class="perf-item-box highlighted">
-                                <div class="perf-item-label" style="color: #38BDF8;">MJ7 Net Profit</div>
-                                <div class="perf-item-value" style="color: #38BDF8;">${drv_data['MJ7_NET']:,.2f}</div>
-                            </div>
+                        <div style="background-color: #F8FAFC; border: 1px solid #E2E8F0; border-radius: 8px; padding: 14px; text-align: left;">
+                            <div style="font-size: 11px; text-transform: uppercase; color: #64748B; font-weight: 600; letter-spacing: 0.5px; margin-bottom: 4px;">Owner Pay</div>
+                            <div style="font-size: 20px; color: #1E293B; font-weight: 700;">${drv_data['OWNER_PAY']:,.2f}</div>
+                        </div>
+                        <div style="background-color: #EFF6FF; border: 1px solid #BFDBFE; border-radius: 8px; padding: 14px; text-align: left;">
+                            <div style="font-size: 11px; text-transform: uppercase; color: #1E40AF; font-weight: 600; letter-spacing: 0.5px; margin-bottom: 4px;">MJ7 Net Profit</div>
+                            <div style="font-size: 20px; color: #1D4ED8; font-weight: 700;">${drv_data['MJ7_NET']:,.2f}</div>
                         </div>
                     </div>
                 </div>
                 """
                 st.markdown(card_html, unsafe_allow_html=True)
                 
-                # Lógica Nativa para Generar y Descargar la Imagen PNG de este Chofer Específico
+                # --------------------------------------------------
+                # LÓGICA PILLOW (Para la imagen descargable PNG)
+                # --------------------------------------------------
                 def generate_single_card_image(driver_id, name_str, row_data):
                     img_w, img_h = 600, 260
-                    img = Image.new("RGB", (img_w, img_h), "#1E293B")
+                    # Fondo blanco limpio
+                    img = Image.new("RGB", (img_w, img_h), "#FFFFFF")
                     draw = ImageDraw.Draw(img)
                     
-                    # Header Azul/Negro de la Tarjeta Imagen
-                    draw.rectangle([0, 0, img_w, 75], fill="#1B2631")
-                    draw.text((25, 18), "MJ7 LOGISTICS CENTER — PERFORMANCE CARD", fill="#38BDF8")
-                    draw.text((25, 45), f"Date: {datetime.now().strftime('%Y-%m-%d')}", fill="#94A3B8")
+                    # Simular un borde general en la imagen para que luzca como tarjeta
+                    draw.rectangle([0, 0, img_w-1, img_h-1], outline="#E2E8F0", width=1)
                     
-                    # Intentar pegar el logo físico en la esquina derecha del header de la imagen
+                    # Header (Fondo sutil o simplemente texto ordenado)
+                    draw.text((25, 20), "MJ7 LOGISTICS CENTER", fill="#1E293B")
+                    draw.text((25, 42), f"Generated on: {datetime.now().strftime('%Y-%m-%d')}", fill="#64748B")
+                    
+                    # Pegar el logo si existe
                     try:
                         logo_img = Image.open("logo.jpeg").convert("RGB")
                         logo_img = logo_img.resize((70, 35))
@@ -292,32 +309,34 @@ with tabs[2]:
                     except Exception:
                         pass
                         
-                    # Línea divisoria azul brillante
-                    draw.line([(0, 75), (img_w, 75)], fill="#38BDF8", width=2)
+                    # Línea divisoria muy tenue
+                    draw.line([(25, 75), (575, 75)], fill="#E2E8F0", width=1)
                     
-                    # Metadatos del Chofer en el bloque Gris
-                    draw.text((25, 95), f"DRIVER ID: {driver_id}   |   NAME: {name_str}", fill="#FFFFFF")
+                    # Barra de metadatos gris claro
+                    draw.rectangle([25, 90, 575, 125], fill="#F8FAFC")
+                    draw.text((35, 100), f"DRIVER ID: {driver_id}   |   NAME: {name_str}", fill="#334155")
                     
-                    # Grid de Indicadores Financieros
+                    # Grid de Indicadores Financieros (Fondos claros)
                     # Caja 1: Gross
-                    draw.rectangle([25, 135, 195, 225], fill="#0F172A", outline="#334155")
-                    draw.text((40, 148), "TOTAL GROSS", fill="#94A3B8")
-                    draw.text((40, 180), f"${row_data['GROSS']:,.2f}", fill="#F8FAFC")
+                    draw.rectangle([25, 145, 195, 230], fill="#F8FAFC", outline="#E2E8F0")
+                    draw.text((35, 155), "TOTAL GROSS", fill="#64748B")
+                    draw.text((35, 185), f"${row_data['GROSS']:,.2f}", fill="#1E293B")
                     
                     # Caja 2: Owner Pay
-                    draw.rectangle([210, 135, 385, 225], fill="#0F172A", outline="#334155")
-                    draw.text((225, 148), "OWNER PAY", fill="#94A3B8")
-                    draw.text((225, 180), f"${row_data['OWNER_PAY']:,.2f}", fill="#F8FAFC")
+                    draw.rectangle([210, 145, 385, 230], fill="#F8FAFC", outline="#E2E8F0")
+                    draw.text((220, 155), "OWNER PAY", fill="#64748B")
+                    draw.text((220, 185), f"${row_data['OWNER_PAY']:,.2f}", fill="#1E293B")
                     
-                    # Caja 3: MJ7 Net (Resaltada)
-                    draw.rectangle([400, 135, 575, 225], fill="#0F172A", outline="#38BDF8")
-                    draw.text((415, 148), "MJ7 NET PROFIT", fill="#38BDF8")
-                    draw.text((415, 180), f"${row_data['MJ7_NET']:,.2f}", fill="#38BDF8")
+                    # Caja 3: MJ7 Net (Resaltada en Azul Corporativo Ejecutivo)
+                    draw.rectangle([400, 145, 575, 230], fill="#EFF6FF", outline="#BFDBFE")
+                    draw.text((410, 155), "MJ7 NET PROFIT", fill="#1E40AF")
+                    draw.text((410, 185), f"${row_data['MJ7_NET']:,.2f}", fill="#1D4ED8")
                     
                     buf = io.BytesIO()
                     img.save(buf, format="PNG")
                     return buf.getvalue()
                 
+                # Botón de descarga
                 single_img_data = generate_single_card_image(d_id, d_name, drv_data)
                 st.download_button(
                     label=f"📥 Download Card Image ({d_id})",
