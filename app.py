@@ -490,7 +490,7 @@ with tabs[5]:
         filtered_results = loads[loads["LOAD"].astype(str).str.contains(query_string, case=False)]
         st.dataframe(filtered_results, use_container_width=True)
 
-#PARTE 4 DE 4
+# ==================================================
 # TAB 7: EXECUTIVE PDF REPORT ENGINE
 # ==================================================
 with tabs[6]:
@@ -535,13 +535,12 @@ with tabs[6]:
             
         # Generar tabla con formato limpio
         cols = df_display.columns.to_list()
-        formatted_table_data = [[Paragraph(str(c).replace("_", " "), text_styles['Normal']) for c in cols]]
+        formatted_table_data = [[Paragraph(f"<b>{str(c).replace('_', ' ')}</b>", text_styles['Normal']) for c in cols]]
         
         for _, row in df_display.iterrows():
             row_items = []
             for col in cols:
                 val = row[col]
-                # Aplicar formato de moneda solo a columnas financieras
                 if col in ["GROSS", "OWNER_PAY", "DISPATCH", "FACTORING", "MJ7_NET", "AMOUNT"]:
                     item_text = f"${float(val):,.2f}" if pd.notnull(val) else "$0.00"
                 elif isinstance(val, (datetime, pd.Timestamp)):
@@ -553,8 +552,8 @@ with tabs[6]:
             
         report_table = Table(formatted_table_data, repeatRows=1)
         report_table.setStyle(TableStyle([
-            ('BACKGROUND', (0,0), (-1,0), colors.HexColor('#1E293B')),
-            ('TEXTCOLOR', (0,0), (-1,0), colors.whitesmoke),
+            ('BACKGROUND', (0,0), (-1,0), colors.HexColor('#475569')), # Azul-Gris más claro
+            ('TEXTCOLOR', (0,0), (-1,0), colors.white),                # Fuente blanca para contraste
             ('ALIGN', (0,0), (-1,-1), 'CENTER'),
             ('VALIGN', (0,0), (-1,-1), 'MIDDLE'),
             ('GRID', (0,0), (-1,-1), 0.5, colors.HexColor('#CBD5E1')),
@@ -564,7 +563,7 @@ with tabs[6]:
         pdf_canvas.build(elements_list)
         return byte_stream.getvalue()
 
-    # Lógica de botones (se mantiene igual)
+    # Lógica de botones
     if selected_scope == "Complete General Financial Overview":
         if st.button("Compile Financial Report"):
             if not settlements.empty:
@@ -576,7 +575,6 @@ with tabs[6]:
     elif selected_scope == "Isolated Driver Analytical View":
         driver_uid_pick = st.selectbox("Select Target Driver Unique ID:", drivers["DRIVER_ID"].unique() if not drivers.empty else [])
         if st.button("Compile Driver Report") and driver_uid_pick:
-            st.write("Columnas disponibles:", settlements.columns.tolist())
             subset = settlements[settlements["DRIVER_ID"].astype(str) == str(driver_uid_pick)]
             if not subset.empty:
                 pdf_binary = compile_pdf_document(subset, f"Driver Analytical Ledger ({driver_uid_pick})", True, subset['MJ7_NET'].sum(), subset['OWNER_PAY'].sum())
@@ -592,6 +590,3 @@ with tabs[6]:
                 st.download_button("📥 Save Fuel Ledger PDF", pdf_binary, f"MJ7_Fuel_Audit_{datetime.now().strftime('%Y%m%d')}.pdf", "application/pdf")
             else:
                 st.warning("No diesel or fuel records logged yet.")
-                
-
-
