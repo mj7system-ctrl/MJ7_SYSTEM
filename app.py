@@ -241,7 +241,7 @@ with tabs[2]:
                     d_name = "Unknown Driver Name"
                 
                 # --------------------------------------------------
-                # ESTILO HTML CLEAN LOOK (Corregido usando tablas estables)
+                # ESTILO HTML CLEAN LOOK (Estructura de tabla inline)
                 # --------------------------------------------------
                 card_html = f"""
                 <div style="
@@ -285,10 +285,12 @@ with tabs[2]:
                     </table>
                 </div>
                 """
-                st.markdown(card_html, unsafe_allow_html=True)
+                
+                # Renderizado forzado como HTML puro (elimina saltos de línea conflictivos)
+                st.html(card_html.strip().replace("\n", ""))
                 
                 # --------------------------------------------------
-                # LÓGICA PILLOW ACTUALIZADA (Imagen PNG con Clean Look)
+                # LÓGICA PILLOW (Imagen PNG con Clean Look)
                 # --------------------------------------------------
                 def generate_single_card_image(driver_id, name_str, row_data):
                     img_w, img_h = 600, 260
