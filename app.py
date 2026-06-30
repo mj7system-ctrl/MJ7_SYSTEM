@@ -211,7 +211,7 @@ with tabs[2]:
         st.markdown("---")
         st.subheader("Production Metrics Matrix")
         
-        # 💡 DETALLE POR CARGA: Agrupamos por Chofer Y por Carga (asumiendo "LOAD_ID", cámbialo si es necesario)
+        # Detalle por carga: Agrupamos por Chofer y por Carga (asumiendo LOAD_ID)
         load_col = "LOAD_ID" if "LOAD_ID" in settlements.columns else (settlements.columns[1] if len(settlements.columns) > 1 else settlements.columns[0])
         
         performance_matrix = settlements.groupby(["DRIVER_ID", load_col]).agg({"GROSS": "sum", "OWNER_PAY": "sum", "MJ7_NET": "sum"}).reset_index()
@@ -285,7 +285,8 @@ with tabs[2]:
                 except Exception:
                     d_name = "Unknown Driver Name"
                 
-                st.write(### f"📋 Performance for: {d_name} ({d_id})")
+                # Línea corregida sin el error de sintaxis del comentario
+                st.write(f"### 📋 Performance for: {d_name} ({d_id})")
                 
                 # 1. GENERAR TARJETA POR CADA CARGA INDIVIDUAL
                 for _, load_row in driver_loads.iterrows():
