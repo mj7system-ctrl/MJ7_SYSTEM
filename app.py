@@ -241,7 +241,7 @@ with tabs[2]:
                     d_name = "Unknown Driver Name"
                 
                 # --------------------------------------------------
-                # ESTILO HTML CLEAN LOOK (Inyectamos estilos directo)
+                # ESTILO HTML CLEAN LOOK (Inline Styles que funcionan al 100%)
                 # --------------------------------------------------
                 card_html = f"""
                 <div style="
@@ -286,22 +286,22 @@ with tabs[2]:
                 st.markdown(card_html, unsafe_allow_html=True)
                 
                 # --------------------------------------------------
-                # LÓGICA PILLOW (Para la imagen descargable PNG)
+                # LÓGICA PILLOW ACTUALIZADA (Imagen PNG con Clean Look)
                 # --------------------------------------------------
                 def generate_single_card_image(driver_id, name_str, row_data):
                     img_w, img_h = 600, 260
-                    # Fondo blanco limpio
+                    # Fondo blanco limpio y profesional
                     img = Image.new("RGB", (img_w, img_h), "#FFFFFF")
                     draw = ImageDraw.Draw(img)
                     
-                    # Simular un borde general en la imagen para que luzca como tarjeta
+                    # Delicado borde exterior para delimitar el tamaño de la tarjeta
                     draw.rectangle([0, 0, img_w-1, img_h-1], outline="#E2E8F0", width=1)
                     
-                    # Header (Fondo sutil o simplemente texto ordenado)
-                    draw.text((25, 20), "MJ7 LOGISTICS CENTER", fill="#1E293B")
-                    draw.text((25, 42), f"Generated on: {datetime.now().strftime('%Y-%m-%d')}", fill="#64748B")
+                    # Header Ejecutivo Limpio (Texto gris oscuro)
+                    draw.text((25, 20), "MJ7 LOGISTICS CENTER — PERFORMANCE CARD", fill="#1E293B")
+                    draw.text((25, 45), f"Date: {datetime.now().strftime('%Y-%m-%d')}", fill="#64748B")
                     
-                    # Pegar el logo si existe
+                    # Pegar el logo en la esquina superior derecha
                     try:
                         logo_img = Image.open("logo.jpeg").convert("RGB")
                         logo_img = logo_img.resize((70, 35))
@@ -309,15 +309,15 @@ with tabs[2]:
                     except Exception:
                         pass
                         
-                    # Línea divisoria muy tenue
+                    # Línea divisoria muy suave en gris claro
                     draw.line([(25, 75), (575, 75)], fill="#E2E8F0", width=1)
                     
-                    # Barra de metadatos gris claro
+                    # Contenedor de Metadatos del Chofer (Fondo gris nube)
                     draw.rectangle([25, 90, 575, 125], fill="#F8FAFC")
                     draw.text((35, 100), f"DRIVER ID: {driver_id}   |   NAME: {name_str}", fill="#334155")
                     
-                    # Grid de Indicadores Financieros (Fondos claros)
-                    # Caja 1: Gross
+                    # --- GRID DE INDICADORES FINANCIEROS ---
+                    # Caja 1: Total Gross
                     draw.rectangle([25, 145, 195, 230], fill="#F8FAFC", outline="#E2E8F0")
                     draw.text((35, 155), "TOTAL GROSS", fill="#64748B")
                     draw.text((35, 185), f"${row_data['GROSS']:,.2f}", fill="#1E293B")
@@ -327,7 +327,7 @@ with tabs[2]:
                     draw.text((220, 155), "OWNER PAY", fill="#64748B")
                     draw.text((220, 185), f"${row_data['OWNER_PAY']:,.2f}", fill="#1E293B")
                     
-                    # Caja 3: MJ7 Net (Resaltada en Azul Corporativo Ejecutivo)
+                    # Caja 3: MJ7 Net Profit (Resaltada en tonos azul claro/royal)
                     draw.rectangle([400, 145, 575, 230], fill="#EFF6FF", outline="#BFDBFE")
                     draw.text((410, 155), "MJ7 NET PROFIT", fill="#1E40AF")
                     draw.text((410, 185), f"${row_data['MJ7_NET']:,.2f}", fill="#1D4ED8")
@@ -336,7 +336,7 @@ with tabs[2]:
                     img.save(buf, format="PNG")
                     return buf.getvalue()
                 
-                # Botón de descarga
+                # Botón de descarga original intacto
                 single_img_data = generate_single_card_image(d_id, d_name, drv_data)
                 st.download_button(
                     label=f"📥 Download Card Image ({d_id})",
