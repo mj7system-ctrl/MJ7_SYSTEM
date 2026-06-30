@@ -399,26 +399,25 @@ with tabs[4]:
                 ws_settlements = get_ws("SETTLEMENTS")
                 # Buscamos en la columna "LOAD_NUMBER" (columna 2)
                 if chosen_load in ws_settlements.col_values(2):
-                    st.error("Error: This load has already been settled.")
-               else:
-                    # Guardamos el settlement en la nube
-                    from datetime import date
-                    l_date = date.today() 
-                    
-                    # Convertimos cada valor a tipo nativo de Python para que el JSON lo acepte
-                    new_settlement = [
-                        str(l_date), 
-                        str(chosen_load), 
-                        str(op_assigned), 
-                        float(gross_revenue), 
-                        float(owner_final), 
-                        float(disp_fee), 
-                        float(fact_fee), 
-                        float(mj7_final)
-                    ]
-                    
-                    ws_settlements.append_row(new_settlement)
-                    st.success("Settlement recorded successfully!")
+                st.error("Error: This load has already been settled.")
+            else:
+                # Guardamos el settlement en la nube
+                from datetime import date
+                l_date = date.today() 
+                
+                new_settlement = [
+                    str(l_date), 
+                    str(chosen_load), 
+                    str(op_assigned), 
+                    float(gross_revenue), 
+                    float(owner_final), 
+                    float(disp_fee), 
+                    float(fact_fee), 
+                    float(mj7_final)
+                ]
+                ws_settlements.append_row(new_settlement)
+                st.success("Settlement recorded successfully!")
+              
                     
                     # Actualizamos el estado de la carga
                     ws_loads = get_ws("CARGAS")
