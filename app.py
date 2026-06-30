@@ -21,7 +21,7 @@ from reportlab.lib import colors
 # ==================================================
 scope = ['https://spreadsheets.google.com/feeds', 'https://www.googleapis.com/auth/drive']
 
-# NUEVA FORMA: Cargar desde los Secrets de Streamlit
+# Cargar desde los Secrets de Streamlit
 creds_dict = dict(st.secrets["gcp_service_account"])
 creds = ServiceAccountCredentials.from_json_keyfile_dict(creds_dict, scope)
 
