@@ -404,8 +404,10 @@ with tabs[4]:
                     st.error("Error: This load has already been settled.")
                 else:
                     # Guardamos el settlement en la nube
+                    from datetime import date
+                    l_date = date.today() 
                     new_settlement = [str(l_date), chosen_load, op_assigned, gross_revenue, owner_final, disp_fee, fact_fee, mj7_final]
-                    ws_settlements.append_row(new_settlement)
+                    ws_settlements.append_row(new_settlement) 
                     
                     # Actualizamos el estado de la carga
                     ws_loads = get_ws("CARGAS")
