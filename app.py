@@ -21,11 +21,10 @@ from reportlab.lib import colors
 # ==================================================
 scope = ['https://spreadsheets.google.com/feeds', 'https://www.googleapis.com/auth/drive']
 
-# Busca el archivo en la misma carpeta del script
-directorio_actual = os.path.dirname(os.path.abspath(__file__))
-ruta_json = os.path.join(directorio_actual, 'service-account.json')
+# NUEVA FORMA: Cargar desde los Secrets de Streamlit
+creds_dict = dict(st.secrets["gcp_service_account"])
+creds = ServiceAccountCredentials.from_json_keyfile_dict(creds_dict, scope)
 
-creds = ServiceAccountCredentials.from_json_keyfile_name(ruta_json, scope)
 client = gspread.authorize(creds)
 
 # Definición del nombre del archivo en Google Sheets
