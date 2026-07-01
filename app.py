@@ -694,8 +694,8 @@ with tabs[6]:
 # NUEVA TAB 8: STATUS VERIFICATION MODULE
 # ==================================================
 with tabs[7]:
-    st.subheader("🚦 Panel de Alertas y Verificación de Estatus")
-    st.caption("Filtro automático de cargas críticas según su fecha de entrega y estado de tránsito.")
+    st.subheader("Panel de Verificación de Estatus")
+    st.caption("Filtro automático y control de cargas según su fecha de entrega y estado de tránsito.")
     st.divider()
 
     if not loads.empty:
@@ -714,92 +714,91 @@ with tabs[7]:
             if status == "CLOSED / SETTLED" or pd.isna(fecha_entrega):
                 continue
                 
-            # ==================================================
-            # PROTECCIÓN SEGURO EN TRES CAPAS (CORRECCIÓN DEFINITIVA)
-            # ==================================================
             try:
-                # Forzamos conversión estricta unificando con Pandas y extrayendo solo la fecha pura
                 f_entrega_pura = pd.to_datetime(fecha_entrega).date()
                 f_hoy_pura = pd.to_datetime(today).date()
-                
                 dias_restantes = (f_entrega_pura - f_hoy_pura).days
             except Exception:
-                # Si una fecha viene corrupta o vacía, le asigna un número neutro para no romper la app
                 dias_restantes = 999 
 
             if status == "DELIVERED":
-                entregadas_por_cerrar.append((row, f"✅ ¡Entregada! Lista para el módulo de liquidaciones."))
+                entregadas_por_cerrar.append((row, "Entrega confirmada. Pendiente de liquidación."))
             elif dias_restantes <= 0 and dias_restantes != 999:
                 if dias_restantes == 0:
-                    msj = "🚨 ¡SE ENTREGA HOY! Monitorear ubicación urgente."
+                    msj = "Entrega programada para el día de hoy."
                 else:
-                    msj = f"⚠️ RETRASADA: Debió entregarse hace {abs(dias_restantes)} días."
+                    msj = f"Estatus demorado por {abs(dias_restantes)} días."
                 criticas.append((row, msj))
             elif dias_restantes == 1:
-                atencion.append((row, "⏳ Próxima a finalizar: Se entrega mañana."))
+                atencion.append((row, "Próxima a finalizar (Mañana)."))
             elif dias_restantes != 999:
-                en_tiempo.append((row, f"🟢 En tiempo (Faltan {dias_restantes} días)."))
+                en_tiempo.append((row, f"En tiempo (Faltan {dias_restantes} días)."))
 
-        # Métricas de resumen ejecutivo estilo corporativo
+        # Métricas de resumen de alta dirección (Estilo Performance Cards)
         m1, m2, m3, m4 = st.columns(4)
-        m1.metric("🔴 Críticas / Vencidas", len(criticas))
-        m2.metric("🟡 Urgentes (Mañana)", len(atencion))
-        m3.metric("🔵 Por Liquidar", len(entregadas_por_cerrar))
-        m4.metric("🟢 En ruta segura", len(en_tiempo))
+        m1.metric("Críticas / Vencidas", len(criticas))
+        m2.metric("Urgentes (Mañana)", len(atencion))
+        m3.metric("Por Liquidar", len(entregadas_por_cerrar))
+        m4.metric("En Ruta Segura", len(en_tiempo))
         st.write("")
 
-        # 1. DESPLIEGUE DE CARGAS CRÍTICAS (ROJO)
+        # 1. SECCIÓN CRÍTICA (Estilo Performance Card - Alerta Fina)
         if criticas:
-            st.markdown("<h4 style='color: #DC2626;'>🚨 Cargas Críticas / Vencidas</h4>", unsafe_allow_html=True)
+            st.markdown("<h5 style='color: #0F172A; font-weight: 600; margin-bottom: 15px;'>Cargas Críticas e Incidencias de Tiempo</h5>", unsafe_allow_html=True)
             for item, motivo in criticas:
                 st.markdown(f"""
-                <div style="background-color: #FEF2F2; border-left: 5px solid #DC2626; border-top: 1px solid #FCA5A5; border-right: 1px solid #FCA5A5; border-bottom: 1px solid #FCA5A5; border-radius: 4px; padding: 12px; margin-bottom: 10px;">
-                    <div style="display: flex; justify-content: space-between;">
-                        <span style="font-weight: bold; color: #991B1B;">📦 Carga: {item['LOAD']} ({item['COMPANY']})</span>
-                        <span style="font-weight: bold; color: #DC2626;">{motivo}</span>
+                <div style="background-color: #FFFFFF; border: 1px solid #E2E8F0; border-left: 5px solid #DC2626; border-radius: 8px; padding: 16px; margin-bottom: 12px; box-shadow: 0 1px 3px rgba(0,0,0,0.02);">
+                    <div style="display: flex; justify-content: space-between; align-items: center;">
+                        <span style="font-weight: 600; color: #0F172A; font-size: 14px; text-transform: uppercase; tracking-content: 0.5px;">Carga: {item['LOAD']} &middot; {item['COMPANY']}</span>
+                        <span style="font-size: 12px; font-weight: 600; color: #DC2626; background-color: #FEF2F2; padding: 4px 8px; border-radius: 4px;">{motivo}</span>
                     </div>
-                    <div style="font-size: 13px; color: #7F1D1D; margin-top: 5px;">
-                        <b>Chofer ID:</b> {item['DRIVER_ID']} | <b>Ruta:</b> {item['ORIGIN']} ➡️ {item['DESTINATION']} | <b>Estatus:</b> {item['STATUS']}
+                    <div style="font-size: 13px; color: #475569; margin-top: 10px; border-top: 1px solid #F1F5F9; padding-top: 10px; display: flex; gap: 15px;">
+                        <div><span style="color: #94A3B8; font-weight: 500;">Operador:</span> <span style="font-weight: 500; color: #334155;">{item['DRIVER_ID']}</span></div>
+                        <div><span style="color: #94A3B8; font-weight: 500;">Ruta:</span> <span style="font-weight: 500; color: #334155;">{item['ORIGIN']} &rarr; {item['DESTINATION']}</span></div>
+                        <div><span style="color: #94A3B8; font-weight: 500;">Estatus:</span> <span style="font-weight: 500; color: #334155;">{item['STATUS']}</span></div>
                     </div>
                 </div>
                 """, unsafe_allow_html=True)
             st.write("")
 
-        # 2. DESPLIEGUE DE CARGAS URGENTES (AMARILLO)
+        # 2. SECCIÓN URGENTE (Estilo Performance Card - Precaución Fina)
         if atencion:
-            st.markdown("<h4 style='color: #D97706;'>⏳ Próximas a Vencer (Mañana)</h4>", unsafe_allow_html=True)
+            st.markdown("<h5 style='color: #0F172A; font-weight: 600; margin-bottom: 15px;'>Cargas Próximas a Vencer</h5>", unsafe_allow_html=True)
             for item, motivo in atencion:
                 st.markdown(f"""
-                <div style="background-color: #FEF3C7; border-left: 5px solid #D97706; border-top: 1px solid #FDE68A; border-right: 1px solid #FDE68A; border-bottom: 1px solid #FDE68A; border-radius: 4px; padding: 12px; margin-bottom: 10px;">
-                    <div style="display: flex; justify-content: space-between;">
-                        <span style="font-weight: bold; color: #92400E;">📦 Carga: {item['LOAD']} ({item['COMPANY']})</span>
-                        <span style="font-weight: bold; color: #B45309;">{motivo}</span>
+                <div style="background-color: #FFFFFF; border: 1px solid #E2E8F0; border-left: 5px solid #D97706; border-radius: 8px; padding: 16px; margin-bottom: 12px; box-shadow: 0 1px 3px rgba(0,0,0,0.02);">
+                    <div style="display: flex; justify-content: space-between; align-items: center;">
+                        <span style="font-weight: 600; color: #0F172A; font-size: 14px; text-transform: uppercase; tracking-content: 0.5px;">Carga: {item['LOAD']} &middot; {item['COMPANY']}</span>
+                        <span style="font-size: 12px; font-weight: 600; color: #B45309; background-color: #FEF3C7; padding: 4px 8px; border-radius: 4px;">{motivo}</span>
                     </div>
-                    <div style="font-size: 13px; color: #78350F; margin-top: 5px;">
-                        <b>Chofer ID:</b> {item['DRIVER_ID']} | <b>Ruta:</b> {item['ORIGIN']} ➡️ {item['DESTINATION']}
+                    <div style="font-size: 13px; color: #475569; margin-top: 10px; border-top: 1px solid #F1F5F9; padding-top: 10px; display: flex; gap: 15px;">
+                        <div><span style="color: #94A3B8; font-weight: 500;">Operador:</span> <span style="font-weight: 500; color: #334155;">{item['DRIVER_ID']}</span></div>
+                        <div><span style="color: #94A3B8; font-weight: 500;">Ruta:</span> <span style="font-weight: 500; color: #334155;">{item['ORIGIN']} &rarr; {item['DESTINATION']}</span></div>
                     </div>
                 </div>
                 """, unsafe_allow_html=True)
             st.write("")
 
-        # 3. DESPLIEGUE DE ENTREGADAS POR LIQUIDAR (AZUL)
+        # 3. SECCIÓN POR LIQUIDAR (Estilo Performance Card - Concluido Fino)
         if entregadas_por_cerrar:
-            st.markdown("<h4 style='color: #2563EB;'>💵 Entregadas listas para Liquidar</h4>", unsafe_allow_html=True)
+            st.markdown("<h5 style='color: #0F172A; font-weight: 600; margin-bottom: 15px;'>Servicios Concluidos por Procesar</h5>", unsafe_allow_html=True)
             for item, motivo in entregadas_por_cerrar:
                 st.markdown(f"""
-                <div style="background-color: #EFF6FF; border-left: 5px solid #2563EB; border-top: 1px solid #BFDBFE; border-right: 1px solid #BFDBFE; border-bottom: 1px solid #BFDBFE; border-radius: 4px; padding: 12px; margin-bottom: 10px;">
-                    <div style="display: flex; justify-content: space-between;">
-                        <span style="font-weight: bold; color: #1E40AF;">📦 Carga: {item['LOAD']} ({item['COMPANY']})</span>
-                        <span style="font-weight: bold; color: #2563EB;">{motivo}</span>
+                <div style="background-color: #FFFFFF; border: 1px solid #E2E8F0; border-left: 5px solid #2563EB; border-radius: 8px; padding: 16px; margin-bottom: 12px; box-shadow: 0 1px 3px rgba(0,0,0,0.02);">
+                    <div style="display: flex; justify-content: space-between; align-items: center;">
+                        <span style="font-weight: 600; color: #0F172A; font-size: 14px; text-transform: uppercase; tracking-content: 0.5px;">Carga: {item['LOAD']} &middot; {item['COMPANY']}</span>
+                        <span style="font-size: 12px; font-weight: 600; color: #1E40AF; background-color: #EFF6FF; padding: 4px 8px; border-radius: 4px;">{motivo}</span>
                     </div>
-                    <div style="font-size: 13px; color: #1E3A8A; margin-top: 5px;">
-                        <b>Chofer ID:</b> {item['DRIVER_ID']} | <b>Monto Gross:</b> ${float(item['AMOUNT']):,.2f} | <b>Destino:</b> {item['DESTINATION']}
+                    <div style="font-size: 13px; color: #475569; margin-top: 10px; border-top: 1px solid #F1F5F9; padding-top: 10px; display: flex; gap: 15px;">
+                        <div><span style="color: #94A3B8; font-weight: 500;">Operador:</span> <span style="font-weight: 500; color: #334155;">{item['DRIVER_ID']}</span></div>
+                        <div><span style="color: #94A3B8; font-weight: 500;">Importe Bruto:</span> <span style="font-weight: 600; color: #0F172A;">${float(item['AMOUNT']):,.2f}</span></div>
+                        <div><span style="color: #94A3B8; font-weight: 500;">Destino final:</span> <span style="font-weight: 500; color: #334155;">{item['DESTINATION']}</span></div>
                     </div>
                 </div>
                 """, unsafe_allow_html=True)
             st.write("")
 
         if not criticas and not atencion and not entregadas_por_cerrar:
-            st.success("🎉 ¡Excelente! No tienes ninguna carga retrasada, urgente ni entregas pendientes por liquidar el día de hoy.")
+            st.success("El sistema no detecta demoras ni servicios pendientes de liquidación para el día de hoy.")
     else:
-        st.info("No hay registros de cargas activos en el sistema para evaluar estatus.")
+        st.info("No se encontraron registros de operaciones activos para el análisis de estatus.")
