@@ -440,12 +440,57 @@ with tabs[4]:
             m_base = gross_revenue * 0.15
             o_base = gross_revenue * 0.85
             disp_fee = gross_revenue * 0.05
-            fact_fee = gross_revenue * 0.0215
+            
+            # ==================================================
+            # INTERRUPTOR DE FACTORING OPCIONAL
+            # ==================================================
+            aplicar_factoring = st.checkbox("¿Aplicar cobro de Factoring (2.15%) a esta carga?", value=True)
+            
+            if aplicar_factoring:
+                fact_fee = gross_revenue * 0.0215
+            else:
+                fact_fee = 0.00 # $0.00 si decides no cobrarlo para proteger el Net de MJ7
             
             mj7_final = m_base - disp_fee - fact_fee
             owner_final = o_base - fuel_deductions - other_deductions
             
-            if st.button("Authorize Settlement"):
+            # ==================================================
+            # PREVISUALIZACIÓN VISUAL ANTES DE AUTORIZAR
+            # ==================================================
+            st.markdown("""
+            <div style="background-color: #FFFFFF; border: 1px solid #E2E8F0; border-radius: 10px; padding: 15px; margin: 15px 0 15px 0; box-shadow: 0 1px 3px rgba(0,0,0,0.05);">
+                <h4 style="color: #0047AB; margin-top: 0; margin-bottom: 5px;">📋 Previsualización Financiera</h4>
+                <p style="font-size: 13px; color: #475569; margin-bottom: 0;">Verifica los montos calculados antes de bloquear y autorizar el pago.</p>
+            </div>
+            """, unsafe_allow_html=True)
+
+            c1, c2, c3, c4 = st.columns(4)
+            c1.metric("Gross Revenue", f"${gross_revenue:,.2f}")
+            c2.metric("Factoring Fee", f"${fact_fee:,.2f}", delta="-2.15%" if aplicar_factoring else "Sin Factoring", delta_color="inverse" if aplicar_factoring else "normal")
+            c3.metric("Fuel Deductions", f"${fuel_deductions:,.2f}")
+            c4.metric("Other Deductions", f"${other_deductions:,.2f}")
+
+            st.write("") 
+
+            c5, c6 = st.columns(2)
+            with c5:
+                st.markdown(f"""
+                <div style="background-color: #F8FAFC; border: 1px solid #E2E8F0; padding: 15px; border-radius: 8px; text-align: center;">
+                    <span style="font-size: 12px; color: #64748B; font-weight: 600; text-transform: uppercase;">Pago Neto Chofer (Owner Pay)</span>
+                    <h2 style="color: #0F172A; margin: 5px 0 0 0;">${owner_final:,.2f}</h2>
+                </div>
+                """, unsafe_allow_html=True)
+            with c6:
+                st.markdown(f"""
+                <div style="background-color: #E0F2FE; border: 1px solid #BAE6FD; padding: 15px; border-radius: 8px; text-align: center;">
+                    <span style="font-size: 12px; color: #0369A1; font-weight: 600; text-transform: uppercase;">Rendimiento Neto MJ7</span>
+                    <h2 style="color: #0369A1; margin: 5px 0 0 0;">${mj7_final:,.2f}</h2>
+                </div>
+                """, unsafe_allow_html=True)
+                
+            st.divider()
+
+            if st.button("Authorize Settlement", use_container_width=True):
                 ws_settlements = get_ws("SETTLEMENTS")
                 if chosen_load in ws_settlements.col_values(2):
                     st.error("Error: This load has already been settled.")
@@ -460,7 +505,7 @@ with tabs[4]:
                         float(gross_revenue), 
                         float(owner_final), 
                         float(disp_fee), 
-                        float(fact_fee), 
+                        float(fact_fee), # Guarda 0 o el porcentaje según tu selección en el checkbox
                         float(mj7_final)
                     ]
                     ws_settlements.append_row(new_settlement)
@@ -481,7 +526,7 @@ with tabs[4]:
                 load_match = load_filtered_df.iloc[0]
                 e_comp = st.text_input("Broker / Client Name", value=load_match["COMPANY"])
                 e_amt = st.number_input("Gross Amount ($)", value=float(load_match["AMOUNT"]), format="%.2f")
-                e_stat = st.selectbox("Status", ["PENDING", "IN TRANSIT", "DELIVERED", "CLOSED / SETTLED"], index=["PENDING", "IN TRANSIT", "DELIVERED", "CLOSED / SETTLED"].index(load_match["STATUS"]))
+                e_stat = st.selectbox("Status", ["PENDING", "IN TRANSIT", "DELIMITED", "CLOSED / SETTLED"], index=["PENDING", "IN TRANSIT", "DELIVERED", "CLOSED / SETTLED"].index(load_match["STATUS"]))
                 e_driver = st.selectbox("Driver Assigned", list(drivers["DRIVER_ID"].astype(str).unique()), index=list(drivers["DRIVER_ID"].astype(str).unique()).index(str(load_match["DRIVER_ID"])))
                 if st.button("Update and Re-Settle"):
                     ws_loads = get_ws("CARGAS")
