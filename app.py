@@ -693,7 +693,7 @@ with tabs[6]:
 # ==================================================
 # NUEVA TAB 8: STATUS VERIFICATION MODULE
 # ==================================================
-with tabs[7]: # 👈 Ahora sí apunta al espacio correcto después del PDF
+with tabs[7]:
     st.subheader("🚦 Panel de Alertas y Verificación de Estatus")
     st.caption("Filtro automático de cargas críticas según su fecha de entrega y estado de tránsito.")
     st.divider()
@@ -714,7 +714,14 @@ with tabs[7]: # 👈 Ahora sí apunta al espacio correcto después del PDF
             if status == "CLOSED / SETTLED" or pd.isna(fecha_entrega):
                 continue
                 
-            dias_restantes = (fecha_entrega - today).days
+            # ==================================================
+            # PROTECCIÓN DE TIPOS DE FECHA (CORRECCIÓN DE ERROR)
+            # ==================================================
+            from datetime import date
+            f_entrega_pura = fecha_entrega if isinstance(fecha_entrega, date) else pd.to_datetime(fecha_entrega).date()
+            f_hoy_pura = today if isinstance(today, date) else pd.to_datetime(today).date()
+            
+            dias_restantes = (f_entrega_pura - f_hoy_pura).days
 
             if status == "DELIVERED":
                 entregadas_por_cerrar.append((row, f"✅ ¡Entregada! Lista para el módulo de liquidaciones."))
@@ -729,6 +736,7 @@ with tabs[7]: # 👈 Ahora sí apunta al espacio correcto después del PDF
             else:
                 en_tiempo.append((row, f"🟢 En tiempo (Faltan {dias_restantes} días)."))
 
+        # Métricas de resumen ejecutivo
         m1, m2, m3, m4 = st.columns(4)
         m1.metric("🔴 Críticas / Vencidas", len(criticas))
         m2.metric("🟡 Urgentes (Mañana)", len(atencion))
@@ -736,6 +744,7 @@ with tabs[7]: # 👈 Ahora sí apunta al espacio correcto después del PDF
         m4.metric("🟢 En ruta segura", len(en_tiempo))
         st.write("")
 
+        # 1. CARGAS CRÍTICAS (ROJO)
         if criticas:
             st.markdown("<h4 style='color: #DC2626;'>🚨 Cargas Críticas / Vencidas</h4>", unsafe_allow_html=True)
             for item, motivo in criticas:
@@ -752,6 +761,7 @@ with tabs[7]: # 👈 Ahora sí apunta al espacio correcto después del PDF
                 """, unsafe_allow_html=True)
             st.write("")
 
+        # 2. CARGAS URGENTES (AMARILLO)
         if atencion:
             st.markdown("<h4 style='color: #D97706;'>⏳ Próximas a Vencer (Mañana)</h4>", unsafe_allow_html=True)
             for item, motivo in atencion:
@@ -768,6 +778,7 @@ with tabs[7]: # 👈 Ahora sí apunta al espacio correcto después del PDF
                 """, unsafe_allow_html=True)
             st.write("")
 
+        # 3. ENTREGADAS POR LIQUIDAR (AZUL)
         if entregadas_por_cerrar:
             st.markdown("<h4 style='color: #2563EB;'>💵 Entregadas listas para Liquidar</h4>", unsafe_allow_html=True)
             for item, motivo in entregadas_por_cerrar:
