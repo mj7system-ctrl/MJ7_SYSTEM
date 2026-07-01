@@ -715,17 +715,21 @@ with tabs[7]:
                 continue
                 
             # ==================================================
-            # PROTECCIÓN DE TIPOS DE FECHA (CORRECCIÓN DE ERROR)
+            # PROTECCIÓN SEGURO EN TRES CAPAS (CORRECCIÓN DEFINITIVA)
             # ==================================================
-            from datetime import date
-            f_entrega_pura = fecha_entrega if isinstance(fecha_entrega, date) else pd.to_datetime(fecha_entrega).date()
-            f_hoy_pura = today if isinstance(today, date) else pd.to_datetime(today).date()
-            
-            dias_restantes = (f_entrega_pura - f_hoy_pura).days
+            try:
+                # Forzamos conversión estricta unificando con Pandas y extrayendo solo la fecha pura
+                f_entrega_pura = pd.to_datetime(fecha_entrega).date()
+                f_hoy_pura = pd.to_datetime(today).date()
+                
+                dias_restantes = (f_entrega_pura - f_hoy_pura).days
+            except Exception:
+                # Si una fecha viene corrupta o vacía, le asigna un número neutro para no romper la app
+                dias_restantes = 999 
 
             if status == "DELIVERED":
                 entregadas_por_cerrar.append((row, f"✅ ¡Entregada! Lista para el módulo de liquidaciones."))
-            elif dias_restantes <= 0:
+            elif dias_restantes <= 0 and dias_restantes != 999:
                 if dias_restantes == 0:
                     msj = "🚨 ¡SE ENTREGA HOY! Monitorear ubicación urgente."
                 else:
@@ -733,10 +737,10 @@ with tabs[7]:
                 criticas.append((row, msj))
             elif dias_restantes == 1:
                 atencion.append((row, "⏳ Próxima a finalizar: Se entrega mañana."))
-            else:
+            elif dias_restantes != 999:
                 en_tiempo.append((row, f"🟢 En tiempo (Faltan {dias_restantes} días)."))
 
-        # Métricas de resumen ejecutivo
+        # Métricas de resumen ejecutivo estilo corporativo
         m1, m2, m3, m4 = st.columns(4)
         m1.metric("🔴 Críticas / Vencidas", len(criticas))
         m2.metric("🟡 Urgentes (Mañana)", len(atencion))
@@ -744,7 +748,7 @@ with tabs[7]:
         m4.metric("🟢 En ruta segura", len(en_tiempo))
         st.write("")
 
-        # 1. CARGAS CRÍTICAS (ROJO)
+        # 1. DESPLIEGUE DE CARGAS CRÍTICAS (ROJO)
         if criticas:
             st.markdown("<h4 style='color: #DC2626;'>🚨 Cargas Críticas / Vencidas</h4>", unsafe_allow_html=True)
             for item, motivo in criticas:
@@ -761,7 +765,7 @@ with tabs[7]:
                 """, unsafe_allow_html=True)
             st.write("")
 
-        # 2. CARGAS URGENTES (AMARILLO)
+        # 2. DESPLIEGUE DE CARGAS URGENTES (AMARILLO)
         if atencion:
             st.markdown("<h4 style='color: #D97706;'>⏳ Próximas a Vencer (Mañana)</h4>", unsafe_allow_html=True)
             for item, motivo in atencion:
@@ -778,7 +782,7 @@ with tabs[7]:
                 """, unsafe_allow_html=True)
             st.write("")
 
-        # 3. ENTREGADAS POR LIQUIDAR (AZUL)
+        # 3. DESPLIEGUE DE ENTREGADAS POR LIQUIDAR (AZUL)
         if entregadas_por_cerrar:
             st.markdown("<h4 style='color: #2563EB;'>💵 Entregadas listas para Liquidar</h4>", unsafe_allow_html=True)
             for item, motivo in entregadas_por_cerrar:
