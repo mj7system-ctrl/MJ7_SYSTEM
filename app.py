@@ -1,4 +1,3 @@
-#PARTE 1 DE 4 
 import streamlit as st
 import pandas as pd
 import gspread
@@ -50,6 +49,7 @@ def load_data():
         if "START_DATE" in df.columns: df["START_DATE"] = pd.to_datetime(df["START_DATE"], errors='coerce')
         if "DELIVERY_DATE" in df.columns: df["DELIVERY_DATE"] = pd.to_datetime(df["DELIVERY_DATE"], errors='coerce')
     return loads, settlements, deductions, drivers
+
 # Cargamos datos una sola vez
 loads, settlements, deductions, drivers = load_data()
 
@@ -159,7 +159,6 @@ with logo_col:
         pass
 st.divider()
 
-#PARTE 2 DE 4 
 # MJ7 PROFITS METRICS
 # ==================================================
 if not settlements.empty:
@@ -181,6 +180,7 @@ st.divider()
 
 # Aesthetic Gray Tabs via Streamlit Material Icons Syntax
 tabs = st.tabs([
+    ":material/smartphone: Mobile Monitor",
     ":material/insert_chart: Loads", 
     ":material/payments: Settlements", 
     ":material/trending_up: Performance", 
@@ -190,20 +190,84 @@ tabs = st.tabs([
     ":material/picture_as_pdf: PDF Reports"
 ])
 
-# TAB 1: LOADS
+# ==================================================
+# TAB 1: MOBILE MONITOR (SECCIÓN OPTIMIZADA PARA CELULAR)
+# ==================================================
 with tabs[0]:
+    st.subheader("📱 Mobile Fleet Monitor")
+    st.write("Vista rápida de cargas activas y pendientes por meter gastos desde tu celular.")
+    
+    if not loads.empty:
+        import base64
+        try:
+            with open("logo.jpeg", "rb") as image_file:
+                encoded_logo = base64.b64encode(image_file.read()).decode()
+            mobile_logo_tag = f'<img src="data:image/jpeg;base64,{encoded_logo}" style="height: 22px; border-radius: 3px;">'
+        except Exception:
+            mobile_logo_tag = ''
+
+        for _, row in loads.iterrows():
+            l_id = row['LOAD']
+            d_id = row['DRIVER_ID']
+            raw_status = str(row['STATUS']).upper().strip()
+            
+            # Cruce dinámico del nombre del chofer
+            try:
+                d_name = drivers[drivers["DRIVER_ID"].astype(str) == str(d_id)]["FULL_NAME"].iloc[0]
+            except Exception:
+                d_name = f"Driver ID: {d_id}"
+                
+            # Lógica del semáforo basado en tu columna real de STATUS
+            if raw_status == "IN TRANSIT":
+                status_label = "🟢 ACTIVE IN ROUTE"
+                badge_bg = "#DCFCE7"
+                badge_text = "#15803D"
+            elif raw_status == "DELIVERED":
+                status_label = "⚠️ LOAD DEDUCTIONS"
+                badge_bg = "#FEF9C3"  # Amarillo de atención
+                badge_text = "#A16207" # Letras oscuras legibles
+            elif raw_status == "PENDING":
+                status_label = "🔴 PENDING ASSIGNMENT"
+                badge_bg = "#FEE2E2"
+                badge_text = "#B91C1C"
+            else:
+                # CLOSED / SETTLED (Se archiva limpio en color gris discreto)
+                status_label = "⚪ CLOSED & SETTLED"
+                badge_bg = "#F1F5F9"
+                badge_text = "#475569"
+
+            mobile_card_html = f"""
+            <div style="background-color: #FFFFFF; border: 1px solid #E2E8F0; border-radius: 10px; padding: 16px; margin-bottom: 12px; font-family: -apple-system, sans-serif; box-shadow: 0 1px 3px rgba(0,0,0,0.04);">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                    <span style="font-size: 15px; font-weight: 700; color: #0F172A;">📦 Load #{l_id}</span>
+                    <span style="background-color: {badge_bg}; color: {badge_text}; font-size: 10.5px; font-weight: 700; padding: 4px 10px; border-radius: 9999px; letter-spacing: 0.3px;">{status_label}</span>
+                </div>
+                <div style="font-size: 13.5px; color: #334155; line-height: 1.5;">
+                    <div style="margin-bottom: 3px;"><b>Driver:</b> {d_name}</div>
+                    <div style="font-size: 12.5px; color: #64748B;"><b>Route:</b> {row['ORIGIN']} ➡️ {row['DESTINATION']}</div>
+                    <div style="display: flex; justify-content: space-between; margin-top: 8px; border-top: 1px solid #F1F5F9; padding-top: 8px; font-weight: 600;">
+                        <span style="color: #0F172A;">Gross: ${float(row['AMOUNT']):,.2f}</span>
+                        <span style="color: #64748B; font-size: 12px; font-weight: 400;">Broker: {row['COMPANY']}</span>
+                    </div>
+                </div>
+            </div>
+            """
+            st.html(mobile_card_html.strip().replace("\n", ""))
+    else:
+        st.info("No logs open or available to show in the Mobile Monitor.")
+
+# TAB 2: LOADS
+with tabs[1]:
     st.subheader("General Loads Registry")
     st.dataframe(loads, use_container_width=True)
 
-# TAB 2: SETTLEMENTS
-with tabs[1]:
+# TAB 3: SETTLEMENTS
+with tabs[2]:
     st.subheader("Closed Settlements History")
     st.dataframe(settlements, use_container_width=True)
 
-# ==================================================
-# TAB 3: PERFORMANCE & CARD GENERATOR
-# ==================================================
-with tabs[2]:
+# TAB 4: PERFORMANCE & CARD GENERATOR
+with tabs[3]:
     st.subheader("Driver Performance Overview")
     st.dataframe(drivers, use_container_width=True)
     
@@ -211,7 +275,6 @@ with tabs[2]:
         st.markdown("---")
         st.subheader("Production Metrics Matrix")
         
-        # Detalle por carga: Agrupamos por Chofer y por Carga (asumiendo LOAD_ID)
         load_col = "LOAD_ID" if "LOAD_ID" in settlements.columns else (settlements.columns[1] if len(settlements.columns) > 1 else settlements.columns[0])
         
         performance_matrix = settlements.groupby(["DRIVER_ID", load_col]).agg({"GROSS": "sum", "OWNER_PAY": "sum", "MJ7_NET": "sum"}).reset_index()
@@ -220,7 +283,6 @@ with tabs[2]:
             use_container_width=True
         )
         
-        # Multiple Driver Selector and Image Generator
         st.markdown("---")
         st.subheader("Generate Performance Cards")
         target_perf_drivers = st.multiselect("Select drivers to generate cards:", performance_matrix["DRIVER_ID"].unique())
@@ -234,7 +296,6 @@ with tabs[2]:
             except Exception:
                 logo_html_tag = ''
 
-            # LÓGICA DE REUTILIZACIÓN PARA PILLOW
             def generate_single_card_image(title_suffix, driver_id, name_str, gross, owner_pay, mj7_net):
                 img_w, img_h = 600, 260
                 img = Image.new("RGB", (img_w, img_h), "#FFFFFF")
@@ -252,21 +313,17 @@ with tabs[2]:
                     pass
                     
                 draw.line([(25, 75), (575, 75)], fill="#E2E8F0", width=1)
-                
                 draw.rectangle([25, 90, 575, 125], fill="#F8FAFC")
                 draw.text((35, 100), f"DRIVER ID: {driver_id}   |   NAME: {name_str}", fill="#334155")
                 
-                # Caja 1: Gross
                 draw.rectangle([25, 145, 195, 230], fill="#F8FAFC", outline="#E2E8F0")
                 draw.text((35, 155), "TOTAL GROSS", fill="#64748B")
                 draw.text((35, 185), f"${gross:,.2f}", fill="#1E293B")
                 
-                # Caja 2: Owner Pay
                 draw.rectangle([210, 145, 385, 230], fill="#F8FAFC", outline="#E2E8F0")
                 draw.text((220, 155), "OWNER PAY", fill="#64748B")
                 draw.text((220, 185), f"${owner_pay:,.2f}", fill="#1E293B")
                 
-                # Caja 3: Net Profit
                 draw.rectangle([400, 145, 575, 230], fill="#EFF6FF", outline="#BFDBFE")
                 draw.text((410, 155), "MJ7 NET PROFIT", fill="#1E40AF")
                 draw.text((410, 185), f"${mj7_net:,.2f}", fill="#1D4ED8")
@@ -275,20 +332,15 @@ with tabs[2]:
                 img.save(buf, format="PNG")
                 return buf.getvalue()
 
-            # Bucle por cada chofer seleccionado
             for d_id in target_perf_drivers:
-                # Filtrar todas las cargas de este chofer específico
                 driver_loads = performance_matrix[performance_matrix["DRIVER_ID"] == d_id]
-                
                 try:
                     d_name = drivers[drivers["DRIVER_ID"].astype(str) == str(d_id)]["FULL_NAME"].iloc[0]
                 except Exception:
                     d_name = "Unknown Driver Name"
                 
-                # Línea corregida sin el error de sintaxis del comentario
                 st.write(f"### 📋 Performance for: {d_name} ({d_id})")
                 
-                # 1. GENERAR TARJETA POR CADA CARGA INDIVIDUAL
                 for _, load_row in driver_loads.iterrows():
                     current_load_id = load_row[load_col]
                     
@@ -325,7 +377,6 @@ with tabs[2]:
                     """
                     st.html(card_html.strip().replace("\n", ""))
                     
-                    # Botón descarga de la carga específica
                     load_img_data = generate_single_card_image(f"LOAD {current_load_id}", d_id, d_name, load_row['GROSS'], load_row['OWNER_PAY'], load_row['MJ7_NET'])
                     st.download_button(
                         label=f"📥 Download Card - Load {current_load_id}",
@@ -335,7 +386,6 @@ with tabs[2]:
                         key=f"btn_dl_{d_id}_{current_load_id}"
                     )
                 
-                # 2. GENERAR TARJETA DE SUMATORIA TOTAL (Solo si tiene más de 1 carga para no repetir)
                 if len(driver_loads) > 1:
                     total_gross = driver_loads['GROSS'].sum()
                     total_owner = driver_loads['OWNER_PAY'].sum()
@@ -370,7 +420,6 @@ with tabs[2]:
                     """
                     st.html(summary_html.strip().replace("\n", ""))
                     
-                    # Botón descarga del Gran Total
                     total_img_data = generate_single_card_image("ACCUMULATED TOTALS", d_id, d_name, total_gross, total_owner, total_net)
                     st.download_button(
                         label=f"📊 Download Cumulative Summary Card",
@@ -381,23 +430,21 @@ with tabs[2]:
                     )
                 
                 st.markdown("<hr style='border: 1px dashed #E2E8F0;'>", unsafe_allow_html=True)
-# TAB 4: DEDUCTIONS
-with tabs[3]:
+
+# TAB 5: DEDUCTIONS
+with tabs[4]:
     st.subheader("Expenses & Deductions Log")
     display_deductions = deductions.copy()
     if "QTY_GALLONS" in display_deductions.columns:
         display_deductions["QTY_GALLONS"] = pd.to_numeric(display_deductions["QTY_GALLONS"]).apply(lambda x: int(x) if x == int(x) else x)
     st.dataframe(display_deductions, use_container_width=True)
 
-# ==================================================
-# TAB 5: OPERATION MODULE (ENTRY & ADJUSTMENTS)
-# ==================================================
-with tabs[4]:
+# TAB 6: OPERATION MODULE (ENTRY & ADJUSTMENTS)
+with tabs[5]:
     st.subheader("Operations Management Module")
     flow = st.radio("Select Action:", ["New Load", "Settle Load", "Modify / Re-Settle Load", "Register Deduction", "Add Driver"], horizontal=True)
     st.divider()
 
-    # Función helper para conectar rápido a las hojas
     def get_ws(name): return client.open(SHEET_NAME).worksheet(name)
 
     if flow == "New Load":
@@ -533,20 +580,16 @@ with tabs[4]:
                 st.success("Done: Driver registered in Cloud.")
                 st.cache_data.clear()
 
-    
-
-# TAB 6: SEARCH ENGINE (Se queda igual, ya lee de memoria)
-with tabs[5]:
+# TAB 7: SEARCH ENGINE
+with tabs[6]:
     st.subheader("Dynamic Load Search Engine")
     query_string = st.text_input("Enter load ID digits or characters:")
     if query_string:
         filtered_results = loads[loads["LOAD"].astype(str).str.contains(query_string, case=False)]
         st.dataframe(filtered_results, use_container_width=True)
 
-# ==================================================
-# TAB 7: EXECUTIVE PDF REPORT ENGINE
-# ==================================================
-with tabs[6]:
+# TAB 8: EXECUTIVE PDF REPORT ENGINE
+with tabs[7]:
     st.subheader("MJ7 Executive Report Engine")
     selected_scope = st.selectbox("Select Report Type Scope:", ["Complete General Financial Overview", "Isolated Driver Analytical View", "Audit Log: Fuel / Diesel Ledger Only"])
     
@@ -569,7 +612,6 @@ with tabs[6]:
         total_style = ParagraphStyle('DocTotals', parent=text_styles['Normal'], fontSize=11, fontName="Helvetica-Bold", textColor=colors.HexColor('#0F172A'), spaceAfter=10)
         cell_style = ParagraphStyle('DataCell', parent=text_styles['Normal'], fontSize=8, alignment=1)
         
-        # --- CRUCE PARA EL NOMBRE DEL DRIVER ---
         df_display = dataframe_source.copy()
         if "DRIVER_ID" in df_display.columns:
             drivers_copy = drivers[['DRIVER_ID', 'FULL_NAME']].copy()
@@ -586,7 +628,6 @@ with tabs[6]:
             elements_list.append(Paragraph(f"TOTAL MJ7 NET PROFIT: ${sum_mj7:,.2f} | TOTAL OPERATOR PAYMENTS: ${sum_owner:,.2f}", total_style))
             elements_list.append(Spacer(1, 10))
             
-        # Generar tabla con formato limpio
         cols = df_display.columns.to_list()
         formatted_table_data = [[Paragraph(f"<b>{str(c).replace('_', ' ')}</b>", text_styles['Normal']) for c in cols]]
         
@@ -605,8 +646,8 @@ with tabs[6]:
             
         report_table = Table(formatted_table_data, repeatRows=1)
         report_table.setStyle(TableStyle([
-            ('BACKGROUND', (0,0), (-1,0), colors.HexColor('#475569')), # Azul-Gris más claro
-            ('TEXTCOLOR', (0,0), (-1,0), colors.white),                # Fuente blanca para contraste
+            ('BACKGROUND', (0,0), (-1,0), colors.HexColor('#475569')),
+            ('TEXTCOLOR', (0,0), (-1,0), colors.white),
             ('ALIGN', (0,0), (-1,-1), 'CENTER'),
             ('VALIGN', (0,0), (-1,-1), 'MIDDLE'),
             ('GRID', (0,0), (-1,-1), 0.5, colors.HexColor('#CBD5E1')),
@@ -616,7 +657,6 @@ with tabs[6]:
         pdf_canvas.build(elements_list)
         return byte_stream.getvalue()
 
-    # Lógica de botones
     if selected_scope == "Complete General Financial Overview":
         if st.button("Compile Financial Report"):
             if not settlements.empty:
