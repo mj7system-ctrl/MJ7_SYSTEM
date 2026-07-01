@@ -187,7 +187,8 @@ tabs = st.tabs([
     ":material/money_off: Deductions", 
     ":material/edit_note: Data Entry", 
     ":material/search: Search Engine", 
-    ":material/picture_as_pdf: PDF Reports"
+    ":material/picture_as_pdf: PDF Reports",
+    ":material/gavel: Status Verification"
 ])
 
 # TAB 1: LOADS
@@ -449,7 +450,7 @@ with tabs[4]:
             if aplicar_factoring:
                 fact_fee = gross_revenue * 0.0215
             else:
-                fact_fee = 0.00 # $0.00 si decides no cobrarlo para proteger el Net de MJ7
+                fact_fee = 0.00 
             
             mj7_final = m_base - disp_fee - fact_fee
             owner_final = o_base - fuel_deductions - other_deductions
@@ -505,7 +506,7 @@ with tabs[4]:
                         float(gross_revenue), 
                         float(owner_final), 
                         float(disp_fee), 
-                        float(fact_fee), # Guarda 0 o el porcentaje según tu selección en el checkbox
+                        float(fact_fee), 
                         float(mj7_final)
                     ]
                     ws_settlements.append_row(new_settlement)
@@ -688,3 +689,102 @@ with tabs[6]:
                 st.download_button("📥 Save Fuel Ledger PDF", pdf_binary, f"MJ7_Fuel_Audit_{datetime.now().strftime('%Y%m%d')}.pdf", "application/pdf")
             else:
                 st.warning("No diesel or fuel records logged yet.")
+                
+# ==================================================
+# NUEVA TAB 8: STATUS VERIFICATION MODULE
+# ==================================================
+with tabs[7]: # 👈 Ahora sí apunta al espacio correcto después del PDF
+    st.subheader("🚦 Panel de Alertas y Verificación de Estatus")
+    st.caption("Filtro automático de cargas críticas según su fecha de entrega y estado de tránsito.")
+    st.divider()
+
+    if not loads.empty:
+        loads_alerts = loads.copy()
+        loads_alerts["DELIVERY_DATE_DT"] = pd.to_datetime(loads_alerts["DELIVERY_DATE"], errors='coerce').dt.date
+        
+        criticas = []
+        atencion = []
+        en_tiempo = []
+        entregadas_por_cerrar = []
+
+        for _, row in loads_alerts.iterrows():
+            status = str(row["STATUS"]).strip().upper()
+            fecha_entrega = row["DELIVERY_DATE_DT"]
+            
+            if status == "CLOSED / SETTLED" or pd.isna(fecha_entrega):
+                continue
+                
+            dias_restantes = (fecha_entrega - today).days
+
+            if status == "DELIVERED":
+                entregadas_por_cerrar.append((row, f"✅ ¡Entregada! Lista para el módulo de liquidaciones."))
+            elif dias_restantes <= 0:
+                if dias_restantes == 0:
+                    msj = "🚨 ¡SE ENTREGA HOY! Monitorear ubicación urgente."
+                else:
+                    msj = f"⚠️ RETRASADA: Debió entregarse hace {abs(dias_restantes)} días."
+                criticas.append((row, msj))
+            elif dias_restantes == 1:
+                atencion.append((row, "⏳ Próxima a finalizar: Se entrega mañana."))
+            else:
+                en_tiempo.append((row, f"🟢 En tiempo (Faltan {dias_restantes} días)."))
+
+        m1, m2, m3, m4 = st.columns(4)
+        m1.metric("🔴 Críticas / Vencidas", len(criticas))
+        m2.metric("🟡 Urgentes (Mañana)", len(atencion))
+        m3.metric("🔵 Por Liquidar", len(entregadas_por_cerrar))
+        m4.metric("🟢 En ruta segura", len(en_tiempo))
+        st.write("")
+
+        if criticas:
+            st.markdown("<h4 style='color: #DC2626;'>🚨 Cargas Críticas / Vencidas</h4>", unsafe_allow_html=True)
+            for item, motivo in criticas:
+                st.markdown(f"""
+                <div style="background-color: #FEF2F2; border-left: 5px solid #DC2626; border-top: 1px solid #FCA5A5; border-right: 1px solid #FCA5A5; border-bottom: 1px solid #FCA5A5; border-radius: 4px; padding: 12px; margin-bottom: 10px;">
+                    <div style="display: flex; justify-content: space-between;">
+                        <span style="font-weight: bold; color: #991B1B;">📦 Carga: {item['LOAD']} ({item['COMPANY']})</span>
+                        <span style="font-weight: bold; color: #DC2626;">{motivo}</span>
+                    </div>
+                    <div style="font-size: 13px; color: #7F1D1D; margin-top: 5px;">
+                        <b>Chofer ID:</b> {item['DRIVER_ID']} | <b>Ruta:</b> {item['ORIGIN']} ➡️ {item['DESTINATION']} | <b>Estatus:</b> {item['STATUS']}
+                    </div>
+                </div>
+                """, unsafe_allow_html=True)
+            st.write("")
+
+        if atencion:
+            st.markdown("<h4 style='color: #D97706;'>⏳ Próximas a Vencer (Mañana)</h4>", unsafe_allow_html=True)
+            for item, motivo in atencion:
+                st.markdown(f"""
+                <div style="background-color: #FEF3C7; border-left: 5px solid #D97706; border-top: 1px solid #FDE68A; border-right: 1px solid #FDE68A; border-bottom: 1px solid #FDE68A; border-radius: 4px; padding: 12px; margin-bottom: 10px;">
+                    <div style="display: flex; justify-content: space-between;">
+                        <span style="font-weight: bold; color: #92400E;">📦 Carga: {item['LOAD']} ({item['COMPANY']})</span>
+                        <span style="font-weight: bold; color: #B45309;">{motivo}</span>
+                    </div>
+                    <div style="font-size: 13px; color: #78350F; margin-top: 5px;">
+                        <b>Chofer ID:</b> {item['DRIVER_ID']} | <b>Ruta:</b> {item['ORIGIN']} ➡️ {item['DESTINATION']}
+                    </div>
+                </div>
+                """, unsafe_allow_html=True)
+            st.write("")
+
+        if entregadas_por_cerrar:
+            st.markdown("<h4 style='color: #2563EB;'>💵 Entregadas listas para Liquidar</h4>", unsafe_allow_html=True)
+            for item, motivo in entregadas_por_cerrar:
+                st.markdown(f"""
+                <div style="background-color: #EFF6FF; border-left: 5px solid #2563EB; border-top: 1px solid #BFDBFE; border-right: 1px solid #BFDBFE; border-bottom: 1px solid #BFDBFE; border-radius: 4px; padding: 12px; margin-bottom: 10px;">
+                    <div style="display: flex; justify-content: space-between;">
+                        <span style="font-weight: bold; color: #1E40AF;">📦 Carga: {item['LOAD']} ({item['COMPANY']})</span>
+                        <span style="font-weight: bold; color: #2563EB;">{motivo}</span>
+                    </div>
+                    <div style="font-size: 13px; color: #1E3A8A; margin-top: 5px;">
+                        <b>Chofer ID:</b> {item['DRIVER_ID']} | <b>Monto Gross:</b> ${float(item['AMOUNT']):,.2f} | <b>Destino:</b> {item['DESTINATION']}
+                    </div>
+                </div>
+                """, unsafe_allow_html=True)
+            st.write("")
+
+        if not criticas and not atencion and not entregadas_por_cerrar:
+            st.success("🎉 ¡Excelente! No tienes ninguna carga retrasada, urgente ni entregas pendientes por liquidar el día de hoy.")
+    else:
+        st.info("No hay registros de cargas activos en el sistema para evaluar estatus.")
