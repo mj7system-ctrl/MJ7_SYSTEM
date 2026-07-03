@@ -666,48 +666,6 @@ with tabs[4]:
                 st.success("Done: Driver registered in Cloud.")
                 st.cache_data.clear()
 
-# ==================================================
-# TAB 6: SEARCH ENGINE
-# ==================================================
-with tabs[5]:
-    st.subheader("Dynamic Search Engine")
-    st.caption("Search across active database registries by specific load numbers or driver profiles.")
-    st.markdown("---")
-    
-    col_search_type, col_search_input = st.columns([1, 2])
-    
-    with col_search_type:
-        search_mode = st.radio(
-            "Search Category:",
-            ["By Load ID", "By Driver ID"],
-            horizontal=False
-        )
-        
-    with col_search_input:
-        if search_mode == "By Load ID":
-            query_string = st.text_input("Enter Load ID digits or characters:", placeholder="e.g., 4052")
-            if query_string:
-                filtered_results = loads[loads["LOAD"].astype(str).str.contains(query_string, case=False)]
-            else:
-                filtered_results = loads.copy()
-                
-        else:
-            driver_list = ["Select a Driver..."] + sorted(loads["DRIVER_ID"].dropna().unique().tolist())
-            selected_driver = st.selectbox("Select Driver Profile:", driver_list)
-            
-            if selected_driver != "Select a Driver...":
-                filtered_results = loads[loads["DRIVER_ID"] == selected_driver]
-            else:
-                filtered_results = loads.copy()
-
-    st.markdown("---")
-    
-    st.markdown(f"**Records Found:** `{len(filtered_results)}` entries matching criteria.")
-    
-    if len(filtered_results) > 0:
-        st.dataframe(filtered_results, width="stretch")
-    else:
-        st.warning("No records match your search criteria. Please adjust filters.")
 
 # ==================================================
 # TAB 6: SEARCH ENGINE
