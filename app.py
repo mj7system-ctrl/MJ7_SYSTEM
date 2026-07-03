@@ -518,24 +518,30 @@ with tabs[4]:
             fuel_deductions = float(associated_costs[associated_costs["TYPE"] == "FUEL"]["AMOUNT"].sum())
             other_deductions = float(associated_costs[associated_costs["TYPE"] == "OTHER"]["AMOUNT"].sum())
             
-            # Distribución base comercial
+            # 1. Distribución comercial estricta sobre el 100% de la carga
             m_base = gross_revenue * 0.15
             o_base = gross_revenue * 0.85
             disp_fee = gross_revenue * 0.05
             
-            # Interrupción de factoring controlado (Gasto del Chofer)
+            # ==================================================
+            # INTERRUPTOR DE FACTORING CONTROLADO (Gasto del Chofer)
+            # ==================================================
             aplicar_factoring = st.checkbox("Apply Factoring Fee (2.15%) to this load?", value=True)
             
             if aplicar_factoring:
                 fact_fee = gross_revenue * 0.0215
-                mj7_final = m_base - disp_fee
-                owner_final = o_base - fuel_deductions - other_deductions - fact_fee
             else:
                 fact_fee = 0.0
-                mj7_final = m_base - disp_fee
-                owner_final = o_base - fuel_deductions - other_deductions
+                
+            # Restas exactas según tu regla de negocio:
+            # A MJ7 solo se le quita dispatch
+            mj7_final = m_base - disp_fee
+            # Al driver se le quita fuel, deducciones y factoring
+            owner_final = o_base - fuel_deductions - other_deductions - fact_fee
             
-            # Previsualización visual corporativa antes de autorizar
+            # ==================================================
+            # PREVISUALIZACIÓN VISUAL ANTES DE AUTORIZAR
+            # ==================================================
             st.markdown("""
             <div style="background-color: #FFFFFF; border: 1px solid #E2E8F0; border-radius: 6px; padding: 15px; margin: 15px 0 15px 0;">
                 <h4 style="color: #1E3A8A; margin-top: 0; margin-bottom: 5px; font-weight: 600;">Financial Preview</h4>
