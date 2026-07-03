@@ -514,31 +514,23 @@ with tabs[4]:
             op_assigned = match["DRIVER_ID"]
             gross_revenue = float(match["AMOUNT"])
             
+            # Obtener y filtrar deducciones
             associated_costs = deductions[deductions["LOAD_NUMBER"].astype(str) == chosen_load]
             fuel_deductions = float(associated_costs[associated_costs["TYPE"] == "FUEL"]["AMOUNT"].sum())
             other_deductions = float(associated_costs[associated_costs["TYPE"] == "OTHER"]["AMOUNT"].sum())
             
-            # ==================================================
-            # MATEMÁTICA ESTRICTA (Calculado sobre el 100% Gross)
-            # ==================================================
-            m_base = gross_revenue * 0.15  # 15% Base MJ7
-            o_base = gross_revenue * 0.85  # 85% Base Driver
-            
-            disp_fee = gross_revenue * 0.05  # Dispatch (5% del Gross)
+            # Matemática estricta sobre el Gross
+            m_base = gross_revenue * 0.15
+            o_base = gross_revenue * 0.85
+            disp_fee = gross_revenue * 0.05
             
             aplicar_factoring = st.checkbox("Apply Factoring Fee (2.15%) to this load?", value=True)
-            if aplicar_factoring:
-                fact_fee = gross_revenue * 0.0215  # Factoring (2.15% del Gross)
-            else:
-                fact_fee = 0.0
+            fact_fee = gross_revenue * 0.0215 if aplicar_factoring else 0.0
                 
-            # Restas finales en sus respectivas bolsas
             mj7_final = m_base - disp_fee
             owner_final = o_base - fact_fee - fuel_deductions - other_deductions
             
-            # ==================================================
-            # PREVISUALIZACIÓN VISUAL ANTES DE AUTORIZAR (Auditoría de Porcentajes)
-            # ==================================================
+            # UI: Previsualización Financiera
             st.markdown("""
             <div style="background-color: #FFFFFF; border: 1px solid #E2E8F0; border-radius: 6px; padding: 15px; margin: 15px 0 15px 0;">
                 <h4 style="color: #1E3A8A; margin-top: 0; margin-bottom: 5px; font-weight: 600;">Financial Preview & Audit Log</h4>
@@ -546,7 +538,6 @@ with tabs[4]:
             </div>
             """, unsafe_allow_html=True)
 
-            # Fila 1: Las bases de cálculo claras (100%, 15%, 85%)
             col_g1, col_g2, col_g3 = st.columns(3)
             col_g1.metric("Gross Revenue (100%)", f"${gross_revenue:,.2f}")
             col_g2.metric("MJ7 Revenue Allocation (15%)", f"${m_base:,.2f}")
@@ -554,31 +545,40 @@ with tabs[4]:
 
             st.write("")
 
-            # Fila 2: Los descuentos aplicados directamente del 100% Gross
             col_d1, col_d2, col_d3 = st.columns(3)
             col_d1.metric("Dispatch Fee (5% of Gross)", f"${disp_fee:,.2f}")
             col_d2.metric("Factoring Fee (2.15% of Gross)", f"${fact_fee:,.2f}")
-            col_d3.metric("Fuel & Other Deductions", f"${(fuel_deductions + other_deductions):,.2f}")
+            col_d3.metric("Total Deductions", f"${(fuel_deductions + other_deductions):,.2f}")
 
             st.write("") 
 
-            # Fila 3: Los rendimientos finales netos
             c5, c6 = st.columns(2)
             with c5:
                 st.markdown(f"""
                 <div style="background-color: #F8FAFC; border: 1px solid #E2E8F0; padding: 15px; border-radius: 6px; text-align: center;">
-                    <span style="font-size: 11px; color: #64748B; font-weight: 600; text-transform: uppercase;">Owner Net Pay (85% Allocation - 2.15% Factoring - Deductions)</span>
+                    <span style="font-size: 11px; color: #64748B; font-weight: 600; text-transform: uppercase;">Owner Net Pay</span>
                     <h2 style="color: #0F172A; margin: 5px 0 0 0; font-weight: 700;">${owner_final:,.2f}</h2>
                 </div>
                 """, unsafe_allow_html=True)
             with c6:
                 st.markdown(f"""
                 <div style="background-color: #F0F9FF; border: 1px solid #B9E6FE; padding: 15px; border-radius: 6px; text-align: center;">
-                    <span style="font-size: 11px; color: #0369A1; font-weight: 600; text-transform: uppercase;">MJ7 Net Yield (15% Allocation - 5% Dispatch)</span>
+                    <span style="font-size: 11px; color: #0369A1; font-weight: 600; text-transform: uppercase;">MJ7 Net Yield</span>
                     <h2 style="color: #0369A1; margin: 5px 0 0 0; font-weight: 700;">${mj7_final:,.2f}</h2>
                 </div>
                 """, unsafe_allow_html=True)
                 
+            st.write("")
+            
+            # VISUALIZACIÓN NUEVA: Tabla de auditoría interna de deducciones vinculadas
+            st.markdown("### Linked Deductions Breakdown")
+            if not associated_costs.empty:
+                display_deductions = associated_costs[["DATE", "TYPE", "DESCRIPTION", "AMOUNT"]].copy()
+                display_deductions.columns = ["Date Registered", "Category", "Memo / Description", "Amount ($)"]
+                st.dataframe(display_deductions, use_container_width=True, hide_index=True)
+            else:
+                st.caption("No registered fuel or additional operational costs found for this specific load reference.")
+
             st.divider()
 
             if st.button("Authorize Settlement", use_container_width=True):
@@ -653,6 +653,17 @@ with tabs[4]:
                         get_ws("DEDUCTIONS").append_row(new_ded)
                         st.success("Done: Deduction saved in Cloud.")
                         st.cache_data.clear()
+                
+                # VISUALIZACIÓN NUEVA: Muestra las deducciones existentes de la carga seleccionada dentro del mismo flujo
+                st.write("")
+                st.markdown("### Existing Deductions for Selected Driver")
+                current_driver_deds = deductions[deductions["DRIVER_ID"].astype(str) == selected_driver_context]
+                if not current_driver_deds.empty:
+                    df_view = current_driver_deds[["DATE", "LOAD_NUMBER", "TYPE", "DESCRIPTION", "AMOUNT"]].copy()
+                    df_view.columns = ["Date", "Load ID", "Type", "Memo", "Amount ($)"]
+                    st.dataframe(df_view, use_container_width=True, hide_index=True)
+                else:
+                    st.caption("No historical deductions logged yet for this driver configuration.")
 
     elif flow == "Add Driver":
         with st.form("driver_addition_form", clear_on_submit=True):
