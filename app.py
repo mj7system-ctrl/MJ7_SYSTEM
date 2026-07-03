@@ -654,13 +654,50 @@ with tabs[4]:
 
     
 
-# TAB 6: SEARCH ENGINE (Se queda igual, ya lee de memoria)
+# TAB 6: SEARCH ENGINE (Updated with exact column names from image)
 with tabs[5]:
-    st.subheader("Dynamic Load Search Engine")
-    query_string = st.text_input("Enter load ID digits or characters:")
-    if query_string:
-        filtered_results = loads[loads["LOAD"].astype(str).str.contains(query_string, case=False)]
+    st.subheader("Dynamic Search Engine")
+    st.caption("Search across active database registries by specific load numbers or driver profiles.")
+    st.markdown("---")
+    
+    # 1. Creamos dos columnas para darte opciones de búsqueda limpia
+    col_search_type, col_search_input = st.columns([1, 2])
+    
+    with col_search_type:
+        search_mode = st.radio(
+            "Search Category:",
+            ["By Load ID", "By Driver ID"],
+            horizontal=False
+        )
+        
+    with col_search_input:
+        if search_mode == "By Load ID":
+            query_string = st.text_input("Enter Load ID digits or characters:", placeholder="e.g., 4052")
+            if query_string:
+                filtered_results = loads[loads["LOAD"].astype(str).str.contains(query_string, case=False)]
+            else:
+                filtered_results = loads.copy()
+                
+        else:
+            # CORRECCIÓN: Aquí ya lee exactamente tu columna 'DRIVER_ID'
+            driver_list = ["Select a Driver..."] + sorted(loads["DRIVER_ID"].dropna().unique().tolist())
+            selected_driver = st.selectbox("Select Driver Profile:", driver_list)
+            
+            # CORRECCIÓN: Filtramos usando la columna exacta de tu Excel
+            if selected_driver != "Select a Driver...":
+                filtered_results = loads[loads["DRIVER_ID"] == selected_driver]
+            else:
+                filtered_results = loads.copy()
+
+    st.markdown("---")
+    
+    # 2. Mostramos los resultados útiles y el contador de integridad
+    st.markdown(f"**Records Found:** `{len(filtered_results)}` entries matching criteria.")
+    
+    if len(filtered_results) > 0:
         st.dataframe(filtered_results, use_container_width=True)
+    else:
+        st.warning("No records match your search criteria. Please adjust filters.")
 
 # ==================================================
 # TAB 7: EXECUTIVE PDF REPORT ENGINE
