@@ -520,15 +520,17 @@ with tabs[4]:
             # ==================================================
             aplicar_factoring = st.checkbox("¿Aplicar cobro de Factoring (2.15%) a esta carga?", value=True)
             
-            if aplicar_factoring:
-                fact_fee = gross_revenue * 0.0215
-            else:
-                fact_fee = 0.00 
+            # El cargo por factoring se calcula siempre
+            fact_fee = gross_revenue * 0.0215
             
-            # CORRECCIÓN: MJ7 ya no absorbe el factoring
-            mj7_final = m_base - disp_fee
-            # CORRECCIÓN: El costo de factoring ahora lo absorbe el chofer
-            owner_final = o_base - fuel_deductions - other_deductions - fact_fee
+            if aplicar_factoring:
+                # SÍ: Lo absorbe el chofer (se le resta a él, MJ7 queda protegido)
+                mj7_final = m_base - disp_fee
+                owner_final = o_base - fuel_deductions - other_deductions - fact_fee
+            else:
+                # NO: Lo absorbe MJ7 (se le resta a la empresa, el chofer queda protegido)
+                mj7_final = m_base - disp_fee - fact_fee
+                owner_final = o_base - fuel_deductions - other_deductions
             
             # ==================================================
             # PREVISUALIZACIÓN VISUAL ANTES DE AUTORIZAR
@@ -542,7 +544,7 @@ with tabs[4]:
 
             c1, c2, c3, c4 = st.columns(4)
             c1.metric("Gross Revenue", f"${gross_revenue:,.2f}")
-            c2.metric("Factoring Fee", f"${fact_fee:,.2f}", delta="-2.15%" if aplicar_factoring else "Sin Factoring", delta_color="inverse" if aplicar_factoring else "normal")
+            c2.metric("Factoring Fee", f"${fact_fee:,.2f}", delta="-2.15% (Chofer)" if aplicar_factoring else "-2.15% (MJ7)", delta_color="inverse")
             c3.metric("Fuel Deductions", f"${fuel_deductions:,.2f}")
             c4.metric("Other Deductions", f"${other_deductions:,.2f}")
 
@@ -653,7 +655,6 @@ with tabs[4]:
                 get_ws("DRIVERS").append_row(new_d)
                 st.success("Done: Driver registered in Cloud.")
                 st.cache_data.clear()
-
     
 
 # TAB 6: SEARCH ENGINE (Updated with exact column names from image)
