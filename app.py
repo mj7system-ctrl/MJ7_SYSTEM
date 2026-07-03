@@ -206,7 +206,7 @@ with tabs[1]:
 # ==================================================
 with tabs[2]:
     st.subheader("Driver Performance Overview")
-    st.dataframe(drivers, use_container_width=True)
+    st.dataframe(drivers, width="stretch")
     
     if not settlements.empty:
         st.markdown("---")
@@ -236,7 +236,7 @@ with tabs[2]:
             
             st.dataframe(
                 performance_matrix.style.format({"GROSS": "${:,.2f}", "OWNER_PAY": "${:,.2f}", "MJ7_NET": "${:,.2f}"}), 
-                use_container_width=True
+                width="stretch"
             )
             
             st.markdown("---")
@@ -420,6 +420,12 @@ with tabs[2]:
                                 </div>
                                 {logo_html_tag}
                             </div>
+                            
+                            <div style="background-color: #FFFFFF; border: 1px solid #CBD5E1; border-radius: 6px; padding: 10px 14px; font-size: 13px; color: #334155; margin-bottom: 20px;">
+                                <span style="color: #64748B; font-weight: 600;">DRIVER ID:</span> <span style="font-weight: 700; color: #0F172A;">{d_id}</span> | 
+                                <span style="color: #64748B; font-weight: 600;">NAME:</span> <span style="font-weight: 700; color: #0F172A;">{d_name}</span>
+                            </div>
+                            
                             <table style="width: 100%; border-collapse: separate; border-spacing: 16px 0; margin-left: -16px; margin-right: -16px;">
                                 <tr>
                                     <td style="width: 33.33%; background-color: #FFFFFF; border: 1px solid #CBD5E1; border-radius: 8px; padding: 14px;">
@@ -449,7 +455,8 @@ with tabs[2]:
                             data=summary_pdf_data,
                             file_name=f"MJ7_{title_summary}_{d_id}.pdf",
                             mime="application/pdf",
-                            key=f"btn_pdf_total_{d_id}"
+                            key=f"btn_pdf_total_{d_id}",
+                            width="stretch"
                         )
                     
                     st.markdown("<hr style='border: 1px dashed #E2E8F0;'>", unsafe_allow_html=True)
