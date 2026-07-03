@@ -514,7 +514,6 @@ with tabs[4]:
             op_assigned = match["DRIVER_ID"]
             gross_revenue = float(match["AMOUNT"])
             
-            # Obtener y filtrar deducciones
             associated_costs = deductions[deductions["LOAD_NUMBER"].astype(str) == chosen_load]
             fuel_deductions = float(associated_costs[associated_costs["TYPE"] == "FUEL"]["AMOUNT"].sum())
             other_deductions = float(associated_costs[associated_costs["TYPE"] == "OTHER"]["AMOUNT"].sum())
@@ -570,11 +569,11 @@ with tabs[4]:
                 
             st.write("")
             
-            # VISUALIZACIÓN NUEVA: Tabla de auditoría interna de deducciones vinculadas
+            # VISUALIZACIÓN CORREGIDA: Se usa la columna CONCEPT mapeada de forma estricta
             st.markdown("### Linked Deductions Breakdown")
             if not associated_costs.empty:
-                display_deductions = associated_costs[["DATE", "TYPE", "DESCRIPTION", "AMOUNT"]].copy()
-                display_deductions.columns = ["Date Registered", "Category", "Memo / Description", "Amount ($)"]
+                display_deductions = associated_costs[["DATE", "TYPE", "CONCEPT", "AMOUNT"]].copy()
+                display_deductions.columns = ["Date Registered", "Category", "Concept / Description", "Amount ($)"]
                 st.dataframe(display_deductions, use_container_width=True, hide_index=True)
             else:
                 st.caption("No registered fuel or additional operational costs found for this specific load reference.")
@@ -649,18 +648,19 @@ with tabs[4]:
                         d_gal = st.number_input("Gallons", min_value=0.0, step=0.01) if d_clog == "FUEL" else 0.0
                         d_vcost = st.number_input("Total Amount ($)", min_value=0.0, step=1.00, format="%.2f")
                     if st.form_submit_button("Save Deduction"):
+                        # Se mapea de acuerdo al orden exacto del formulario a la hoja
                         new_ded = [str(d_fdate), d_cload, selected_driver_context, d_clog, d_desc, float(d_gal), str(today), float(d_vcost)]
                         get_ws("DEDUCTIONS").append_row(new_ded)
                         st.success("Done: Deduction saved in Cloud.")
                         st.cache_data.clear()
                 
-                # VISUALIZACIÓN NUEVA: Muestra las deducciones existentes de la carga seleccionada dentro del mismo flujo
+                # VISUALIZACIÓN CORREGIDA: Historial usando las columnas mapeadas reales de tu hoja
                 st.write("")
                 st.markdown("### Existing Deductions for Selected Driver")
                 current_driver_deds = deductions[deductions["DRIVER_ID"].astype(str) == selected_driver_context]
                 if not current_driver_deds.empty:
-                    df_view = current_driver_deds[["DATE", "LOAD_NUMBER", "TYPE", "DESCRIPTION", "AMOUNT"]].copy()
-                    df_view.columns = ["Date", "Load ID", "Type", "Memo", "Amount ($)"]
+                    df_view = current_driver_deds[["DATE", "LOAD_NUMBER", "TYPE", "CONCEPT", "AMOUNT"]].copy()
+                    df_view.columns = ["Date", "Load ID", "Type", "Concept", "Amount ($)"]
                     st.dataframe(df_view, use_container_width=True, hide_index=True)
                 else:
                     st.caption("No historical deductions logged yet for this driver configuration.")
