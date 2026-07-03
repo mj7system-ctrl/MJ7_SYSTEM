@@ -525,8 +525,10 @@ with tabs[4]:
             else:
                 fact_fee = 0.00 
             
-            mj7_final = m_base - disp_fee - fact_fee
-            owner_final = o_base - fuel_deductions - other_deductions
+            # CORRECCIÓN: MJ7 ya no absorbe el factoring
+            mj7_final = m_base - disp_fee
+            # CORRECCIÓN: El costo de factoring ahora lo absorbe el chofer
+            owner_final = o_base - fuel_deductions - other_deductions - fact_fee
             
             # ==================================================
             # PREVISUALIZACIÓN VISUAL ANTES DE AUTORIZAR
