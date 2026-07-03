@@ -518,25 +518,23 @@ with tabs[4]:
             fuel_deductions = float(associated_costs[associated_costs["TYPE"] == "FUEL"]["AMOUNT"].sum())
             other_deductions = float(associated_costs[associated_costs["TYPE"] == "OTHER"]["AMOUNT"].sum())
             
+            # Distribución base comercial
             m_base = gross_revenue * 0.15
             o_base = gross_revenue * 0.85
             disp_fee = gross_revenue * 0.05
             
             # ==================================================
-            # INTERRUPTOR DE FACTORING OPCIONAL
+            # INTERRUPTOR DE FACTORING CONTROLADO (Gasto del Chofer)
             # ==================================================
             aplicar_factoring = st.checkbox("¿Aplicar cobro de Factoring (2.15%) a esta carga?", value=True)
             
-            # El cargo por factoring se calcula siempre
-            fact_fee = gross_revenue * 0.0215
-            
             if aplicar_factoring:
-                # SÍ: Lo absorbe el chofer (se le resta a él, MJ7 queda protegido)
+                fact_fee = gross_revenue * 0.0215
                 mj7_final = m_base - disp_fee
                 owner_final = o_base - fuel_deductions - other_deductions - fact_fee
             else:
-                # NO: Lo absorbe MJ7 (se le resta a la empresa, el chofer queda protegido)
-                mj7_final = m_base - disp_fee - fact_fee
+                fact_fee = 0.0
+                mj7_final = m_base - disp_fee
                 owner_final = o_base - fuel_deductions - other_deductions
             
             # ==================================================
@@ -551,9 +549,9 @@ with tabs[4]:
 
             c1, c2, c3, c4 = st.columns(4)
             c1.metric("Gross Revenue", f"${gross_revenue:,.2f}")
-            c2.metric("Factoring Fee", f"${fact_fee:,.2f}", delta="-2.15% (Chofer)" if aplicar_factoring else "-2.15% (MJ7)", delta_color="inverse")
-            c3.metric("Fuel Deductions", f"${fuel_deductions:,.2f}")
-            c4.metric("Other Deductions", f"${other_deductions:,.2f}")
+            c2.metric("Dispatch Fee (MJ7)", f"${disp_fee:,.2f}", delta="-5.00%", delta_color="inverse")
+            c3.metric("Factoring Fee (Driver)", f"${fact_fee:,.2f}", delta="-2.15%" if aplicar_factoring else "$0.00", delta_color="inverse")
+            c4.metric("Total Deductions", f"${(fuel_deductions + other_deductions):,.2f}")
 
             st.write("") 
 
@@ -575,7 +573,7 @@ with tabs[4]:
                 
             st.divider()
 
-            if st.button("Authorize Settlement", use_container_width=True):
+            if st.button("Authorize Settlement", width="stretch"):
                 ws_settlements = get_ws("SETTLEMENTS")
                 if chosen_load in ws_settlements.col_values(2):
                     st.error("Error: This load has already been settled.")
@@ -611,7 +609,7 @@ with tabs[4]:
                 load_match = load_filtered_df.iloc[0]
                 e_comp = st.text_input("Broker / Client Name", value=load_match["COMPANY"])
                 e_amt = st.number_input("Gross Amount ($)", value=float(load_match["AMOUNT"]), format="%.2f")
-                e_stat = st.selectbox("Status", ["PENDING", "IN TRANSIT", "DELIMITED", "CLOSED / SETTLED"], index=["PENDING", "IN TRANSIT", "DELIVERED", "CLOSED / SETTLED"].index(load_match["STATUS"]))
+                e_stat = st.selectbox("Status", ["PENDING", "IN TRANSIT", "DELIVERED", "CLOSED / SETTLED"], index=["PENDING", "IN TRANSIT", "DELIVERED", "CLOSED / SETTLED"].index(load_match["STATUS"]))
                 e_driver = st.selectbox("Driver Assigned", list(drivers["DRIVER_ID"].astype(str).unique()), index=list(drivers["DRIVER_ID"].astype(str).unique()).index(str(load_match["DRIVER_ID"])))
                 if st.button("Update and Re-Settle"):
                     ws_loads = get_ws("CARGAS")
@@ -664,13 +662,14 @@ with tabs[4]:
                 st.cache_data.clear()
     
 
-# TAB 6: SEARCH ENGINE (Updated with exact column names from image)
+# ==================================================
+# TAB 6: SEARCH ENGINE
+# ==================================================
 with tabs[5]:
     st.subheader("Dynamic Search Engine")
     st.caption("Search across active database registries by specific load numbers or driver profiles.")
     st.markdown("---")
     
-    # 1. Creamos dos columnas para darte opciones de búsqueda limpia
     col_search_type, col_search_input = st.columns([1, 2])
     
     with col_search_type:
@@ -689,11 +688,9 @@ with tabs[5]:
                 filtered_results = loads.copy()
                 
         else:
-            # CORRECCIÓN: Aquí ya lee exactamente tu columna 'DRIVER_ID'
             driver_list = ["Select a Driver..."] + sorted(loads["DRIVER_ID"].dropna().unique().tolist())
             selected_driver = st.selectbox("Select Driver Profile:", driver_list)
             
-            # CORRECCIÓN: Filtramos usando la columna exacta de tu Excel
             if selected_driver != "Select a Driver...":
                 filtered_results = loads[loads["DRIVER_ID"] == selected_driver]
             else:
@@ -701,11 +698,10 @@ with tabs[5]:
 
     st.markdown("---")
     
-    # 2. Mostramos los resultados útiles y el contador de integridad
     st.markdown(f"**Records Found:** `{len(filtered_results)}` entries matching criteria.")
     
     if len(filtered_results) > 0:
-        st.dataframe(filtered_results, use_container_width=True)
+        st.dataframe(filtered_results, width="stretch")
     else:
         st.warning("No records match your search criteria. Please adjust filters.")
 
