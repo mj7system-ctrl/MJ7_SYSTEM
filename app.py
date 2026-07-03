@@ -518,60 +518,63 @@ with tabs[4]:
             fuel_deductions = float(associated_costs[associated_costs["TYPE"] == "FUEL"]["AMOUNT"].sum())
             other_deductions = float(associated_costs[associated_costs["TYPE"] == "OTHER"]["AMOUNT"].sum())
             
-            # 1. Distribución comercial estricta sobre el 100% de la carga
-            m_base = gross_revenue * 0.15
-            o_base = gross_revenue * 0.85
-            
-            # CORRECCIÓN DE DISPATCH: Se calcula sobre el 15% de MJ7
-            disp_fee = m_base * 0.05
-            
             # ==================================================
-            # INTERRUPTOR DE FACTORING CONTROLADO (Gasto del Chofer)
+            # MATEMÁTICA ESTRICTA (Calculado sobre el 100% Gross)
             # ==================================================
+            m_base = gross_revenue * 0.15  # 15% Base MJ7
+            o_base = gross_revenue * 0.85  # 85% Base Driver
+            
+            disp_fee = gross_revenue * 0.05  # Dispatch (5% del Gross)
+            
             aplicar_factoring = st.checkbox("Apply Factoring Fee (2.15%) to this load?", value=True)
-            
             if aplicar_factoring:
-                # CORRECCIÓN DE FACTORING: Se calcula sobre el 85% del Driver
-                fact_fee = o_base * 0.0215
+                fact_fee = gross_revenue * 0.0215  # Factoring (2.15% del Gross)
             else:
                 fact_fee = 0.0
                 
-            # Restas exactas según tu regla de negocio:
-            # A MJ7 solo se le quita su dispatch
+            # Restas finales en sus respectivas bolsas
             mj7_final = m_base - disp_fee
-            # Al driver se le quita fuel, deducciones y su factoring correspondiente
-            owner_final = o_base - fuel_deductions - other_deductions - fact_fee
+            owner_final = o_base - fact_fee - fuel_deductions - other_deductions
             
             # ==================================================
-            # PREVISUALIZACIÓN VISUAL ANTES DE AUTORIZAR
+            # PREVISUALIZACIÓN VISUAL ANTES DE AUTORIZAR (Auditoría de Porcentajes)
             # ==================================================
             st.markdown("""
             <div style="background-color: #FFFFFF; border: 1px solid #E2E8F0; border-radius: 6px; padding: 15px; margin: 15px 0 15px 0;">
-                <h4 style="color: #1E3A8A; margin-top: 0; margin-bottom: 5px; font-weight: 600;">Financial Preview</h4>
-                <p style="font-size: 13px; color: #475569; margin-bottom: 0;">Verify the calculated amounts before closing and authorizing settlement.</p>
+                <h4 style="color: #1E3A8A; margin-top: 0; margin-bottom: 5px; font-weight: 600;">Financial Preview & Audit Log</h4>
+                <p style="font-size: 13px; color: #475569; margin-bottom: 0;">Complete distribution Breakdown based on 100% Gross Revenue.</p>
             </div>
             """, unsafe_allow_html=True)
 
-            c1, c2, c3, c4 = st.columns(4)
-            c1.metric("Gross Revenue", f"${gross_revenue:,.2f}")
-            c2.metric("Dispatch Fee (MJ7)", f"${disp_fee:,.2f}", delta="-5.00%", delta_color="inverse")
-            c3.metric("Factoring Fee", f"${fact_fee:,.2f}", delta="-2.15%" if aplicar_factoring else "$0.00", delta_color="inverse")
-            c4.metric("Total Deductions", f"${(fuel_deductions + other_deductions):,.2f}")
+            # Fila 1: Las bases de cálculo claras (100%, 15%, 85%)
+            col_g1, col_g2, col_g3 = st.columns(3)
+            col_g1.metric("Gross Revenue (100%)", f"${gross_revenue:,.2f}")
+            col_g2.metric("MJ7 Revenue Allocation (15%)", f"${m_base:,.2f}")
+            col_g3.metric("Driver Revenue Allocation (85%)", f"${o_base:,.2f}")
+
+            st.write("")
+
+            # Fila 2: Los descuentos aplicados directamente del 100% Gross
+            col_d1, col_d2, col_d3 = st.columns(3)
+            col_d1.metric("Dispatch Fee (5% of Gross)", f"${disp_fee:,.2f}")
+            col_d2.metric("Factoring Fee (2.15% of Gross)", f"${fact_fee:,.2f}")
+            col_d3.metric("Fuel & Other Deductions", f"${(fuel_deductions + other_deductions):,.2f}")
 
             st.write("") 
 
+            # Fila 3: Los rendimientos finales netos
             c5, c6 = st.columns(2)
             with c5:
                 st.markdown(f"""
                 <div style="background-color: #F8FAFC; border: 1px solid #E2E8F0; padding: 15px; border-radius: 6px; text-align: center;">
-                    <span style="font-size: 12px; color: #64748B; font-weight: 600; text-transform: uppercase;">Owner Net Pay</span>
+                    <span style="font-size: 11px; color: #64748B; font-weight: 600; text-transform: uppercase;">Owner Net Pay (85% Allocation - 2.15% Factoring - Deductions)</span>
                     <h2 style="color: #0F172A; margin: 5px 0 0 0; font-weight: 700;">${owner_final:,.2f}</h2>
                 </div>
                 """, unsafe_allow_html=True)
             with c6:
                 st.markdown(f"""
                 <div style="background-color: #F0F9FF; border: 1px solid #B9E6FE; padding: 15px; border-radius: 6px; text-align: center;">
-                    <span style="font-size: 12px; color: #0369A1; font-weight: 600; text-transform: uppercase;">MJ7 Net Yield</span>
+                    <span style="font-size: 11px; color: #0369A1; font-weight: 600; text-transform: uppercase;">MJ7 Net Yield (15% Allocation - 5% Dispatch)</span>
                     <h2 style="color: #0369A1; margin: 5px 0 0 0; font-weight: 700;">${mj7_final:,.2f}</h2>
                 </div>
                 """, unsafe_allow_html=True)
@@ -665,7 +668,6 @@ with tabs[4]:
                 get_ws("DRIVERS").append_row(new_d)
                 st.success("Done: Driver registered in Cloud.")
                 st.cache_data.clear()
-
 
 # ==================================================
 # TAB 6: SEARCH ENGINE
