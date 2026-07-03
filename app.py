@@ -521,7 +521,9 @@ with tabs[4]:
             # 1. Distribución comercial estricta sobre el 100% de la carga
             m_base = gross_revenue * 0.15
             o_base = gross_revenue * 0.85
-            disp_fee = gross_revenue * 0.05
+            
+            # CORRECCIÓN DE DISPATCH: Se calcula sobre el 15% de MJ7
+            disp_fee = m_base * 0.05
             
             # ==================================================
             # INTERRUPTOR DE FACTORING CONTROLADO (Gasto del Chofer)
@@ -529,14 +531,15 @@ with tabs[4]:
             aplicar_factoring = st.checkbox("Apply Factoring Fee (2.15%) to this load?", value=True)
             
             if aplicar_factoring:
-                fact_fee = gross_revenue * 0.0215
+                # CORRECCIÓN DE FACTORING: Se calcula sobre el 85% del Driver
+                fact_fee = o_base * 0.0215
             else:
                 fact_fee = 0.0
                 
             # Restas exactas según tu regla de negocio:
-            # A MJ7 solo se le quita dispatch
+            # A MJ7 solo se le quita su dispatch
             mj7_final = m_base - disp_fee
-            # Al driver se le quita fuel, deducciones y factoring
+            # Al driver se le quita fuel, deducciones y su factoring correspondiente
             owner_final = o_base - fuel_deductions - other_deductions - fact_fee
             
             # ==================================================
@@ -662,6 +665,49 @@ with tabs[4]:
                 get_ws("DRIVERS").append_row(new_d)
                 st.success("Done: Driver registered in Cloud.")
                 st.cache_data.clear()
+
+# ==================================================
+# TAB 6: SEARCH ENGINE
+# ==================================================
+with tabs[5]:
+    st.subheader("Dynamic Search Engine")
+    st.caption("Search across active database registries by specific load numbers or driver profiles.")
+    st.markdown("---")
+    
+    col_search_type, col_search_input = st.columns([1, 2])
+    
+    with col_search_type:
+        search_mode = st.radio(
+            "Search Category:",
+            ["By Load ID", "By Driver ID"],
+            horizontal=False
+        )
+        
+    with col_search_input:
+        if search_mode == "By Load ID":
+            query_string = st.text_input("Enter Load ID digits or characters:", placeholder="e.g., 4052")
+            if query_string:
+                filtered_results = loads[loads["LOAD"].astype(str).str.contains(query_string, case=False)]
+            else:
+                filtered_results = loads.copy()
+                
+        else:
+            driver_list = ["Select a Driver..."] + sorted(loads["DRIVER_ID"].dropna().unique().tolist())
+            selected_driver = st.selectbox("Select Driver Profile:", driver_list)
+            
+            if selected_driver != "Select a Driver...":
+                filtered_results = loads[loads["DRIVER_ID"] == selected_driver]
+            else:
+                filtered_results = loads.copy()
+
+    st.markdown("---")
+    
+    st.markdown(f"**Records Found:** `{len(filtered_results)}` entries matching criteria.")
+    
+    if len(filtered_results) > 0:
+        st.dataframe(filtered_results, width="stretch")
+    else:
+        st.warning("No records match your search criteria. Please adjust filters.")
 
 # ==================================================
 # TAB 6: SEARCH ENGINE
