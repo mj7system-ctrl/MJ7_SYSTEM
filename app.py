@@ -1,4 +1,3 @@
-#PARTE 1 DE 4 
 import streamlit as st
 import pandas as pd
 import gspread
@@ -72,27 +71,103 @@ def load_data():
 loads, settlements, deductions, drivers, expense_fin, truck_pay, dispatch_track = load_data()
 
 # ==================================================
-# CLEAN VISUAL STYLES
+# PREMIUM CORPORATE VISUAL STYLES
 # ==================================================
 st.markdown(
 """
 <style>
     @import url('https://fonts.googleapis.com/css2?family=Inter:wght=400;500;600;700&display=swap');
-    html, body, [data-testid="stSidebar"] { font-family: 'Inter', sans-serif; background-color: #F8FAFC; }
-    [data-testid="stSidebar"] { background-color: #0F172A !important; color: #F8FAFC !important; }
-    [data-testid="stSidebar"] h1, [data-testid="stSidebar"] span, [data-testid="stSidebar"] p { color: #E2E8F0 !important; }
     
-    h1 { color: #0047AB; font-weight: 700; letter-spacing: -0.75px; }
-    h2, h3 { color: #1E293B; font-weight: 600; letter-spacing: -0.5px; }
+    /* Configuración Global */
+    html, body, [data-testid="stSidebar"] { 
+        font-family: 'Inter', sans-serif; 
+        background-color: #F8FAFC; 
+    }
     
-    [data-testid="metric-container"] { background: #FFFFFF; padding: 20px; border-radius: 8px; border: 1px solid #E2E8F0; }
-    [data-testid="stMetricLabel"] { color: #64748B !important; font-weight: 600 !important; font-size: 0.75rem !important; text-transform: uppercase; }
-    [data-testid="stMetricValue"] { color: #0F172A !important; font-weight: 700 !important; font-size: 1.5rem !important; }
+    /* Sidebar Premium */
+    [data-testid="stSidebar"] { 
+        background-color: #0F172A !important; 
+        color: #F8FAFC !important; 
+        border-right: 1px solid #1E293B;
+    }
+    [data-testid="stSidebar"] h1, [data-testid="stSidebar"] span, [data-testid="stSidebar"] p { 
+        color: #E2E8F0 !important; 
+    }
     
-    .stButton button { background: #1E293B !important; color: #FFFFFF !important; border-radius: 6px !important; padding: 10px 20px !important; font-weight: 600 !important; border: none !important; width: 100%; }
-    .stButton button:hover { background: #0F172A !important; }
+    /* Títulos Principales */
+    h1 { 
+        color: #0F172A; 
+        font-weight: 700; 
+        letter-spacing: -0.03em; 
+        margin-bottom: 5px !important;
+    }
+    h2, h3 { 
+        color: #1E293B; 
+        font-weight: 600; 
+        letter-spacing: -0.02em; 
+    }
     
-    /* Nueva estructura limpia de tarjeta de rendimiento */
+    /* Rediseño de Tarjetas de Métricas (MJ7 Profits con sombras y hover) */
+    [data-testid="metric-container"] { 
+        background: #FFFFFF !important; 
+        padding: 24px 20px !important; 
+        border-radius: 12px !important; 
+        border: 1px solid #E2E8F0 !important; 
+        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.03) !important;
+        transition: transform 0.2s ease, box-shadow 0.2s ease;
+    }
+    [data-testid="metric-container"]:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.05), 0 4px 6px -2px rgba(0, 0, 0, 0.02) !important;
+    }
+    [data-testid="stMetricLabel"] { 
+        color: #64748B !important; 
+        font-weight: 600 !important; 
+        font-size: 0.8rem !important; 
+        text-transform: uppercase; 
+        letter-spacing: 0.05em;
+    }
+    [data-testid="stMetricValue"] { 
+        color: #0047AB !important; /* Azul corporativo para los montos de ganancias */
+        font-weight: 700 !important; 
+        font-size: 1.75rem !important; 
+        letter-spacing: -0.02em;
+    }
+    
+    /* Estilización de la Barra de Pestañas (Tabs) - Quita el rojo por defecto */
+    button[data-baseweb="tab"] {
+        font-family: 'Inter', sans-serif !important;
+        font-weight: 500 !important;
+        color: #64748B !important;
+        border-bottom-width: 2px !important;
+        border-bottom-color: transparent !important;
+        padding: 10px 16px !important;
+    }
+    button[data-baseweb="tab"]:hover {
+        color: #0F172A !important;
+    }
+    button[data-baseweb="tab"][aria-selected="true"] {
+        color: #0047AB !important; 
+        border-bottom-color: #0047AB !important;
+        font-weight: 600 !important;
+    }
+    
+    /* Botones Globales */
+    .stButton button { 
+        background: #1E293B !important; 
+        color: #FFFFFF !important; 
+        border-radius: 8px !important; 
+        padding: 12px 24px !important; 
+        font-weight: 600 !important; 
+        border: none !important; 
+        width: 100%; 
+        transition: background 0.2s ease;
+    }
+    .stButton button:hover { 
+        background: #0F172A !important; 
+    }
+    
+    /* Tarjeta de rendimiento de choferes */
     .performance-card-container {
         background-color: #1E293B !important; 
         border: 1px solid #334155 !important;
@@ -156,28 +231,26 @@ st.markdown(
         margin-top: 5px !important;
     }
 
-    /* ==================================================
-       NUEVOS ESTILOS CORPORATIVOS COMPATIBLES
-       ================================================== */
+    /* Estilos de las nuevas Tarjetas de Financiamiento Internas */
     .financing-card-container {
         background-color: #FFFFFF !important;
         border: 1px solid #E2E8F0 !important;
-        border-radius: 8px !important;
-        padding: 22px !important;
-        margin-bottom: 18px !important;
+        border-radius: 12px !important;
+        padding: 24px !important;
+        margin-bottom: 20px !important;
         box-shadow: 0 1px 3px rgba(0,0,0,0.02) !important;
     }
     .financing-card-header {
         display: flex !important;
         justify-content: space-between !important;
         border-bottom: 1px solid #F1F5F9 !important;
-        padding-bottom: 12px !important;
+        padding-bottom: 14px !important;
         align-items: center !important;
     }
     .financing-card-driver {
         font-weight: 700 !important;
         color: #0047AB !important;
-        font-size: 1.15rem !important;
+        font-size: 1.2rem !important;
     }
     .financing-card-meta {
         color: #64748B !important;
@@ -192,20 +265,20 @@ st.markdown(
         display: grid !important;
         grid-template-columns: repeat(3, 1fr) !important;
         gap: 20px !important;
-        margin-top: 18px !important;
+        margin-top: 20px !important;
         text-align: center !important;
     }
     .financing-metric-label {
         color: #64748B !important;
-        font-size: 0.72rem !important;
+        font-size: 0.75rem !important;
         font-weight: 600 !important;
         text-transform: uppercase !important;
-        letter-spacing: 0.5px !important;
+        letter-spacing: 0.05em;
     }
     .financing-metric-value {
         color: #0F172A !important;
         font-weight: 700 !important;
-        font-size: 1.4rem !important;
+        font-size: 1.5rem !important;
         margin-top: 4px !important;
     }
     .financing-metric-value.highlighted {
@@ -217,11 +290,11 @@ st.markdown(
         margin-top: 2px !important;
     }
     .financing-timeline {
-        margin-top: 18px !important;
+        margin-top: 20px !important;
         background: #F8FAFC !important;
-        padding: 12px !important;
-        border-radius: 6px !important;
-        font-size: 0.8rem !important;
+        padding: 14px !important;
+        border-radius: 8px !important;
+        font-size: 0.85rem !important;
         color: #475569 !important;
         display: grid !important;
         grid-template-columns: repeat(4, 1fr) !important;
