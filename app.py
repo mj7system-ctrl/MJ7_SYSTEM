@@ -1160,7 +1160,6 @@ with tabs[8]:
     st.subheader("Expense Financing Control")
     st.caption("Internal corporate program to manage driver loans for maintenance and parts with custom financing rates.")
     
-    # Grid de dos columnas: Izquierda para registro, Derecha para actualización rápida
     col_action1, col_action2 = st.columns(2)
     
     with col_action1:
@@ -1181,12 +1180,11 @@ with tabs[8]:
                 else:
                     total_to_pay = f_base_amount * (1 + (f_interest_rate / 100))
                     
-                    # Proyección automática de los 4 viernes consecutivos
                     fridays = []
                     current_date = pd.to_datetime(f_date_start)
                     while len(fridays) < 4:
                         current_date += timedelta(days=1)
-                        if current_date.weekday() == 4:  # 4 es Viernes en Python
+                        if current_date.weekday() == 4:
                             fridays.append(current_date.strftime('%Y-%m-%d'))
                     
                     try:
@@ -1197,7 +1195,7 @@ with tabs[8]:
                             f_truck,
                             f_concept,
                             total_to_pay,
-                            0,  # INSTALLMENTS_PAID inicia en 0
+                            0,
                             fridays[0],
                             fridays[1],
                             fridays[2],
@@ -1215,7 +1213,6 @@ with tabs[8]:
             with st.form("form_update_installment", clear_on_submit=True):
                 st.markdown("<h5 style='color:#1E293B; margin-bottom:15px;'>Record Installment Collection</h5>", unsafe_allow_html=True)
                 
-                # Buscamos solo los acuerdos que tengan menos de 4 pagos realizados
                 active_agreements = expense_fin[expense_fin["INSTALLMENTS_PAID"].astype(int) < 4]
                 
                 if not active_agreements.empty:
@@ -1247,8 +1244,6 @@ with tabs[8]:
             st.info("No records available to update yet.")
 
     st.divider()
-
-    # --- SECCIÓN VISUAL DE AUDITORÍA DINÁMICA ---
     st.markdown("##### Active Agreements Status")
     
     if not expense_fin.empty:
@@ -1263,19 +1258,16 @@ with tabs[8]:
             quota = total_val / 4
             current_debt = max(0.0, total_val - (paid_count * quota))
             
-            # Conversión segura de fechas para auditoría automatizada
             f1_dt = pd.to_datetime(row['FRIDAY_1'], errors='coerce')
             f2_dt = pd.to_datetime(row['FRIDAY_2'], errors='coerce')
             f3_dt = pd.to_datetime(row['FRIDAY_3'], errors='coerce')
             f4_dt = pd.to_datetime(row['FRIDAY_4'], errors='coerce')
             
-            # Lógica Dinámica Inteligente: Completado si ya se pagó la cuota correspondiente O si el calendario ya venció la fecha
             t1_class = "completed" if paid_count >= 1 or (not pd.isna(f1_dt) and f1_dt < current_time_today) else "pending"
             t2_class = "completed" if paid_count >= 2 or (not pd.isna(f2_dt) and f2_dt < current_time_today) else "pending"
             t3_class = "completed" if paid_count >= 3 or (not pd.isna(f3_dt) and f3_dt < current_time_today) else "pending"
             t4_class = "completed" if paid_count >= 4 or (not pd.isna(f4_dt) and f4_dt < current_time_today) else "pending"
             
-            # Nota estructural: El string HTML se mantiene alineado a la izquierda para evitar fallas de Markdown en Streamlit
             card_html = f"""
 <div class="financing-card-container">
     <div class="financing-card-header">
@@ -1345,7 +1337,7 @@ with tabs[9]:
                             t_truck,
                             t_total_value,
                             t_weekly_amort,
-                            0,  # TOTAL_PAID inicia en 0
+                            0,
                             t_date_start.strftime('%Y-%m-%d')
                         ]
                         ws_truck.append_row(new_row)
@@ -1360,55 +1352,56 @@ with tabs[9]:
             with st.form("form_update_truck_pay", clear_on_submit=True):
                 st.markdown("<h5 style='color:#1E293B; margin-bottom:15px;'>Record Weekly Amortization Delivery</h5>", unsafe_allow_html=True)
                 
-                # Filtrar camiones con saldo pendiente
                 active_trucks = truck_pay[truck_pay["TOTAL_PAID"].astype(float) < truck_pay["TOTAL_VALUE"].astype(float)]
                 
                 if not active_trucks.empty:
                     truck_options = active_trucks.apply(lambda r: f"{r['DRIVER']} - Truck: {r['TRUCK_ID']}", axis=1).tolist()
                     selected_truck_opt = st.selectbox("Select Active Truck Ledger", truck_options)
                     
-                    # Descomponer la selección del componente
                     sel_driver = selected_truck_opt.split(" - Truck: ")[0].strip()
                     sel_truck = selected_truck_opt.split(" - Truck: ")[1].strip()
                     
-                    # Buscar la cuota preestablecida original en el DataFrame local
-                    matched_row = active_trucks[(active_trucks["DRIVER"] == sel_driver) & (active_trucks["TRUCK_ID"] == sel_truck)].iloc[0]
-                    default_weekly_rate = float(matched_row["WEEKLY_AMORTIZATION"] or 0.0)
+                    # BLINDAJE ANTI-CRASH: Validamos si el filtro genera registros reales antes de usar .iloc[0]
+                    matched_filter = active_trucks[(active_trucks["DRIVER"] == sel_driver) & (active_trucks["TRUCK_ID"] == sel_truck)]
                     
-                    # --- COMPONENTE FLEXIBLE EDITABLE ---
-                    st.markdown("<p style='margin-bottom:2px; font-size:14px; color:#475569;'>Amount to Pay (USD)</p>", unsafe_allow_html=True)
-                    custom_payment = st.number_input(
-                        "Amount to Pay (USD)", 
-                        min_value=0.0, 
-                        step=50.0, 
-                        value=default_weekly_rate,
-                        label_visibility="collapsed"
-                    )
-                    
-                    st.caption("Applying this record will add the specified amount to the driver's total equity.")
-                    btn_apply_truck_pay = st.form_submit_button("Confirm & Apply Payment")
-                    
-                    if btn_apply_truck_pay:
-                        if custom_payment <= 0:
-                            st.error("Please enter a valid payment amount greater than 0.")
-                        else:
-                            try:
-                                ws_truck = client.open(SHEET_NAME).worksheet("TRUCK_PAYMENTS")
-                                cell = ws_truck.find(sel_truck)
-                                row_idx = cell.row
-                                
-                                current_paid = float(ws_truck.cell(row_idx, 5).value or 0.0)
-                                total_value = float(ws_truck.cell(row_idx, 3).value or 0.0)
-                                
-                                # Sumar el abono personalizado cuidando de no exceder el valor total del activo
-                                new_paid_total = min(current_paid + custom_payment, total_value)
-                                
-                                ws_truck.update_cell(row_idx, 5, new_paid_total)
-                                st.success(f"Payment applied. Total paid updated to ${new_paid_total:,.2f} of ${total_value:,.2f}")
-                                st.cache_data.clear()
-                                st.rerun()
-                            except Exception as e:
-                                st.error(f"Error updating truck balance: {e}")
+                    if not matched_filter.empty:
+                        matched_row = matched_filter.iloc[0]
+                        default_weekly_rate = float(matched_row["WEEKLY_AMORTIZATION"] or 0.0)
+                        
+                        st.markdown("<p style='margin-bottom:2px; font-size:14px; color:#475569;'>Amount to Pay (USD)</p>", unsafe_allow_html=True)
+                        custom_payment = st.number_input(
+                            "Amount to Pay (USD)", 
+                            min_value=0.0, 
+                            step=50.0, 
+                            value=default_weekly_rate,
+                            label_visibility="collapsed"
+                        )
+                        
+                        st.caption("Applying this record will add the specified amount to the driver's total equity.")
+                        btn_apply_truck_pay = st.form_submit_button("Confirm & Apply Payment")
+                        
+                        if btn_apply_truck_pay:
+                            if custom_payment <= 0:
+                                st.error("Please enter a valid payment amount greater than 0.")
+                            else:
+                                try:
+                                    ws_truck = client.open(SHEET_NAME).worksheet("TRUCK_PAYMENTS")
+                                    cell = ws_truck.find(sel_truck)
+                                    row_idx = cell.row
+                                    
+                                    current_paid = float(ws_truck.cell(row_idx, 5).value or 0.0)
+                                    total_value = float(ws_truck.cell(row_idx, 3).value or 0.0)
+                                    
+                                    new_paid_total = min(current_paid + custom_payment, total_value)
+                                    
+                                    ws_truck.update_cell(row_idx, 5, new_paid_total)
+                                    st.success(f"Payment applied. Total paid updated to ${new_paid_total:,.2f} of ${total_value:,.2f}")
+                                    st.cache_data.clear()
+                                    st.rerun()
+                                except Exception as e:
+                                    st.error(f"Error updating truck balance: {e}")
+                    else:
+                        st.error("Error retrieving row details. Please clear cache.")
                 else:
                     st.info("All registered trucks are fully paid and owned.")
         else:
@@ -1509,20 +1502,21 @@ with tabs[10]:
         
         if not dispatch_track.empty:
             try:
-                # Estructuramos localmente el DataFrame para reflejar los pasivos
+                # Copiar y asignar nombres seguros para procesar los datos de deudas independientemente de las columnas antiguas
                 df_debts = dispatch_track.copy()
+                
+                # Forzar que tome las primeras 5 columnas mapeadas para evitar conflictos de nombres
+                df_debts = df_debts.iloc[:, :5]
                 df_debts.columns = ["DATE", "PERSON", "CONCEPT", "TOTAL_DEBT", "AMOUNT_PAID"]
                 
-                df_debts["TOTAL_DEBT"] = df_debts["TOTAL_DEBT"].astype(float)
-                df_debts["AMOUNT_PAID"] = df_debts["AMOUNT_PAID"].astype(float)
+                df_debts["TOTAL_DEBT"] = pd.to_numeric(df_debts["TOTAL_DEBT"], errors='coerce').fillna(0.0)
+                df_debts["AMOUNT_PAID"] = pd.to_numeric(df_debts["AMOUNT_PAID"], errors='coerce').fillna(0.0)
                 
-                # Totales consolidados para armar la gráfica circular
                 global_total_debt = df_debts["TOTAL_DEBT"].sum()
                 global_total_paid = df_debts["AMOUNT_PAID"].sum()
                 global_remaining = max(0.0, global_total_debt - global_total_paid)
                 
                 if global_total_debt > 0:
-                    # Estructura de datos para Plotly Pie
                     pie_data = pd.DataFrame({
                         "Status": ["Total Paid", "Remaining Debt"],
                         "Amount": [global_total_paid, global_remaining]
