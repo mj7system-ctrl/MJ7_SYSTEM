@@ -71,7 +71,7 @@ def load_data():
 loads, settlements, deductions, drivers, expense_fin, truck_pay, dispatch_track = load_data()
 
 # ==================================================
-# PREMIUM CORPORATE VISUAL STYLES
+# ULTRA-PREMIUM CORPORATE VISUAL STYLES
 # ==================================================
 st.markdown(
 """
@@ -82,6 +82,11 @@ st.markdown(
     html, body, [data-testid="stSidebar"] { 
         font-family: 'Inter', sans-serif; 
         background-color: #F8FAFC; 
+    }
+    
+    /* Forzar que CUALQUIER elemento de acento, línea de carga o selección use el azul MJ7 en vez de naranja/rojo */
+    :root {
+        --primary-color: #0047AB !important;
     }
     
     /* Sidebar Premium */
@@ -128,20 +133,20 @@ st.markdown(
         letter-spacing: 0.05em;
     }
     [data-testid="stMetricValue"] { 
-        color: #0047AB !important; /* Azul corporativo para los montos de ganancias */
+        color: #0047AB !important; 
         font-weight: 700 !important; 
         font-size: 1.75rem !important; 
         letter-spacing: -0.02em;
     }
     
-    /* Estilización de la Barra de Pestañas (Tabs) - Quita el rojo por defecto */
+    /* Estilización total de la Barra de Pestañas (Tabs) e inyección del azul corporativo */
     button[data-baseweb="tab"] {
         font-family: 'Inter', sans-serif !important;
         font-weight: 500 !important;
         color: #64748B !important;
-        border-bottom-width: 2px !important;
+        border-bottom-width: 3px !important;
         border-bottom-color: transparent !important;
-        padding: 10px 16px !important;
+        padding: 12px 18px !important;
     }
     button[data-baseweb="tab"]:hover {
         color: #0F172A !important;
@@ -150,6 +155,20 @@ st.markdown(
         color: #0047AB !important; 
         border-bottom-color: #0047AB !important;
         font-weight: 600 !important;
+    }
+    
+    /* Eliminar cualquier línea residual naranja en las pestañas */
+    [data-baseweb="tab-highlight-bar"] {
+        background-color: #0047AB !important;
+    }
+    
+    /* DISEÑO PREMIUM PARA LAS TABLAS (DATAFRAMES Y TABLAS INTERACTIVAS) */
+    [data-testid="stDataFrame"], [data-testid="stTable"] {
+        background: #FFFFFF !important;
+        border: 1px solid #E2E8F0 !important;
+        border-radius: 12px !important;
+        padding: 10px !important;
+        box-shadow: 0 1px 3px rgba(0,0,0,0.02) !important;
     }
     
     /* Botones Globales */
@@ -370,7 +389,6 @@ tabs = st.tabs([
     ":material/local_shipping: Truck Payments",
     ":material/pie_chart: Dispatch Tracker"
 ])
-
 # TAB 1: LOADS
 with tabs[0]:
     st.subheader("General Loads Registry")
