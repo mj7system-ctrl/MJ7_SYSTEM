@@ -1211,12 +1211,10 @@ with tabs[8]:
                         st.error(f"Database sync error: {e}")
 
     with col_action2:
-        # Panel de control manual para registrar abonos sobre la marcha
         if not expense_fin.empty:
             with st.form("form_update_installment", clear_on_submit=True):
                 st.markdown("<h5 style='color:#1E293B; margin-bottom:15px;'>Record Installment Collection</h5>", unsafe_allow_html=True)
                 
-                # Buscamos solo los acuerdos que tengan menos de 4 pagos realizados
                 active_agreements = expense_fin[expense_fin["INSTALLMENTS_PAID"].astype(int) < 4]
                 
                 if not active_agreements.empty:
@@ -1249,7 +1247,7 @@ with tabs[8]:
 
     st.divider()
 
-    # --- SECCIÓN VISUAL DE AUDITORÍA DINÁMICA ---
+    # --- SECCIÓN VISUAL DE AUDITORÍA (CORREGIDA SIN ESPACIOS INTERNOS EXTRA) ---
     st.markdown("##### Active Agreements Status")
     
     if not expense_fin.empty:
@@ -1264,57 +1262,51 @@ with tabs[8]:
             quota = total_val / 4
             current_debt = max(0.0, total_val - (paid_count * quota))
             
-            # Conversión segura de fechas para auditoría automatizada
             f1_dt = pd.to_datetime(row['FRIDAY_1'], errors='coerce')
             f2_dt = pd.to_datetime(row['FRIDAY_2'], errors='coerce')
             f3_dt = pd.to_datetime(row['FRIDAY_3'], errors='coerce')
             f4_dt = pd.to_datetime(row['FRIDAY_4'], errors='coerce')
             
-            # Lógica Dinámica Inteligente: Completado si ya se pagó la cuota correspondiente O si el calendario ya venció la fecha
             t1_class = "completed" if paid_count >= 1 or (not pd.isna(f1_dt) and f1_dt < current_time_today) else "pending"
             t2_class = "completed" if paid_count >= 2 or (not pd.isna(f2_dt) and f2_dt < current_time_today) else "pending"
             t3_class = "completed" if paid_count >= 3 or (not pd.isna(f3_dt) and f3_dt < current_time_today) else "pending"
             t4_class = "completed" if paid_count >= 4 or (not pd.isna(f4_dt) and f4_dt < current_time_today) else "pending"
             
-            st.markdown(
-                f"""
-                <div class="financing-card-container">
-                    <div class="financing-card-header">
-                        <div>
-                            <span class="financing-card-driver">{row['DRIVER']}</span> 
-                            <span class="financing-card-meta"> | Truck: {row['TRUCK_ID']}</span>
-                        </div>
-                        <span class="financing-card-id">ID: {row['ID_FIN']}</span>
-                    </div>
-                    
-                    <div class="financing-grid">
-                        <div>
-                            <div class="financing-metric-label">Total Financed (Fixed)</div>
-                            <div class="financing-metric-value">${total_val:,.2f}</div>
-                            <div class="financing-metric-sub">4 installments of ${quota:,.2f}</div>
-                        </div>
-                        <div>
-                            <div class="financing-metric-label">Installments Collected</div>
-                            <div class="financing-metric-value">{paid_count} <span style="color: #94A3B8; font-size: 1rem; font-weight: 400;">/ 4</span></div>
-                            <div class="financing-metric-sub">Status: {"Complete" if paid_count == 4 else "Active"}</div>
-                        </div>
-                        <div>
-                            <div class="financing-metric-label">Remaining Balance</div>
-                            <div class="financing-metric-value highlighted">${current_debt:,.2f}</div>
-                            <div class="financing-metric-sub">Concept: {row['CONCEPT']}</div>
-                        </div>
-                    </div>
-                    
-                    <div class="financing-timeline">
-                        <div class="timeline-item {t1_class}"><b>Fri 1:</b> {row['FRIDAY_1']}</div>
-                        <div class="timeline-item {t2_class}"><b>Fri 2:</b> {row['FRIDAY_2']}</div>
-                        <div class="timeline-item {t3_class}"><b>Fri 3:</b> {row['FRIDAY_3']}</div>
-                        <div class="timeline-item last {t4_class}"><b>Fri 4:</b> {row['FRIDAY_4']}</div>
-                    </div>
-                </div>
-                """, 
-                unsafe_allow_html=True
-            )
+            # Nota: Mantener el string HTML pegado al borde izquierdo evita fallos de Markdown en Streamlit
+            card_html = f"""
+<div class="financing-card-container">
+    <div class="financing-card-header">
+        <div>
+            <span class="financing-card-driver">{row['DRIVER']}</span> 
+            <span class="financing-card-meta"> | Truck: {row['TRUCK_ID']}</span>
+        </div>
+        <span class="financing-card-id">ID: {row['ID_FIN']}</span>
+    </div>
+    <div class="financing-grid">
+        <div>
+            <div class="financing-metric-label">Total Financed (Fixed)</div>
+            <div class="financing-metric-value">${total_val:,.2f}</div>
+            <div class="financing-metric-sub">4 installments of ${quota:,.2f}</div>
+        </div>
+        <div>
+            <div class="financing-metric-label">Installments Collected</div>
+            <div class="financing-metric-value">{paid_count} <span style="color: #94A3B8; font-size: 1rem; font-weight: 400;">/ 4</span></div>
+            <div class="financing-metric-sub">Status: {"Complete" if paid_count == 4 else "Active"}</div>
+        </div>
+        <div>
+            <div class="financing-metric-label">Remaining Balance</div>
+            <div class="financing-metric-value highlighted">${current_debt:,.2f}</div>
+            <div class="financing-metric-sub">Concept: {row['CONCEPT']}</div>
+        </div>
+    </div>
+    <div class="financing-timeline">
+        <div class="timeline-item {t1_class}"><b>Fri 1:</b> {row['FRIDAY_1']}</div>
+        <div class="timeline-item {t2_class}"><b>Fri 2:</b> {row['FRIDAY_2']}</div>
+        <div class="timeline-item {t3_class}"><b>Fri 3:</b> {row['FRIDAY_3']}</div>
+        <div class="timeline-item last {t4_class}"><b>Fri 4:</b> {row['FRIDAY_4']}</div>
+    </div>
+</div>"""
+            st.markdown(card_html, unsafe_allow_html=True)
     else:
         st.info("No active financing records found.")
 
@@ -1350,7 +1342,7 @@ with tabs[9]:
                             t_truck,
                             t_total_value,
                             t_weekly_amort,
-                            0,  # TOTAL_PAID inicia en 0
+                            0,
                             t_date_start.strftime('%Y-%m-%d')
                         ]
                         ws_truck.append_row(new_row)
@@ -1412,45 +1404,41 @@ with tabs[9]:
             
             progress_pct = min(1.0, t_paid / t_val) if t_val > 0 else 0.0
             
-            st.markdown(
-                f"""
-                <div class="financing-card-container">
-                    <div class="financing-card-header">
-                        <div>
-                            <span class="financing-card-driver">{row['DRIVER']}</span> 
-                            <span class="financing-card-meta"> | Purchase Agreement</span>
-                        </div>
-                        <span class="financing-card-id">Truck ID: {row['TRUCK_ID']}</span>
-                    </div>
-                    
-                    <div class="financing-grid">
-                        <div>
-                            <div class="financing-metric-label">Total Asset Value</div>
-                            <div class="financing-metric-value">${t_val:,.2f}</div>
-                            <div class="financing-metric-sub">Rate: ${t_rate:,.2f} / week</div>
-                        </div>
-                        <div>
-                            <div class="financing-metric-label">Equity Delivered (Paid)</div>
-                            <div class="financing-metric-value">${t_paid:,.2f}</div>
-                            <div class="financing-metric-sub">Progress: {progress_pct*100:.1f}%</div>
-                        </div>
-                        <div>
-                            <div class="financing-metric-label">Remaining Principal</div>
-                            <div class="financing-metric-value highlighted">${t_rem:,.2f}</div>
-                            <div class="financing-metric-sub">Start Date: {row['START_DATE']}</div>
-                        </div>
-                    </div>
-                </div>
-                """, 
-                unsafe_allow_html=True
-            )
+            truck_html = f"""
+<div class="financing-card-container">
+    <div class="financing-card-header">
+        <div>
+            <span class="financing-card-driver">{row['DRIVER']}</span> 
+            <span class="financing-card-meta"> | Purchase Agreement</span>
+        </div>
+        <span class="financing-card-id">Truck ID: {row['TRUCK_ID']}</span>
+    </div>
+    <div class="financing-grid">
+        <div>
+            <div class="financing-metric-label">Total Asset Value</div>
+            <div class="financing-metric-value">${t_val:,.2f}</div>
+            <div class="financing-metric-sub">Rate: ${t_rate:,.2f} / week</div>
+        </div>
+        <div>
+            <div class="financing-metric-label">Equity Delivered (Paid)</div>
+            <div class="financing-metric-value">${t_paid:,.2f}</div>
+            <div class="financing-metric-sub">Progress: {progress_pct*100:.1f}%</div>
+        </div>
+        <div>
+            <div class="financing-metric-label">Remaining Principal</div>
+            <div class="financing-metric-value highlighted">${t_rem:,.2f}</div>
+            <div class="financing-metric-sub">Start Date: {row['START_DATE']}</div>
+        </div>
+    </div>
+</div>"""
+            st.markdown(truck_html, unsafe_allow_html=True)
             st.progress(progress_pct)
     else:
         st.info("No active truck payments portfolios found.")
 
 
 # ==================================================
-# TAB 10: DISPATCH TRACKER
+# TAB 10: DISPATCH TRACKER (TABLAS CON ENCABEZADOS EN AZUL)
 # ==================================================
 with tabs[10]:
     st.subheader("Dispatch Expense & Tracker Audit")
@@ -1507,6 +1495,8 @@ with tabs[10]:
             st.divider()
             
             st.markdown("###### Detailed Transactions Ledger")
+            
+            # --- CAMBIO IMPORTANTE: PASAR POR ST.TABLE SI LOS ENCABEZADOS NATIVOS SE COMPORTAN REBELDES ---
             st.dataframe(
                 dispatch_track.sort_values(by="DATE", ascending=False),
                 column_config={
