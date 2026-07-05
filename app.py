@@ -7,43 +7,407 @@ import plotly.express as px
 from PIL import Image, ImageDraw, ImageFont
 import io
 import os
+
+# ReportLab components
 from reportlab.lib.pagesizes import letter
 from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle
 from reportlab.platypus import Image as RLImage
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.lib import colors
 
-# --- CONFIGURACIÓN ---
-st.set_page_config(page_title="MJ7 Business Suite", layout="wide")
+# ==================================================
+# CONFIGURACIÓN NUBE
+# ==================================================
+scope = ['https://spreadsheets.google.com/feeds', 'https://www.googleapis.com/auth/drive']
 
-if 'pagina_actual' not in st.session_state:
-    st.session_state.pagina_actual = "MENU"
+# Cargar desde los Secrets de Streamlit
+creds_dict = dict(st.secrets["gcp_service_account"])
+creds = ServiceAccountCredentials.from_json_keyfile_dict(creds_dict, scope)
 
-# --- MENÚ PRINCIPAL ---
-if st.session_state.pagina_actual == "MENU":
-    st.markdown("""
-        <div style="background-color: #0F172A; padding: 40px; border-radius: 20px; text-align: center; color: white;">
-            <h1>MJ7 Business Suite</h1>
-            <p>Seleccione un módulo del sistema</p>
-        </div><br>
-    """, unsafe_allow_html=True)
+client = gspread.authorize(creds)
+
+# Definición del nombre del archivo en Google Sheets
+SHEET_NAME = "MJ7_Database"
+
+# State memory management
+if "form_load" not in st.session_state: st.session_state.form_load = ""
+if "form_company" not in st.session_state: st.session_state.form_company = ""
+if "form_amount" not in st.session_state: st.session_state.form_amount = None
+if "form_origin" not in st.session_state: st.session_state.form_origin = ""
+if "form_destination" not in st.session_state: st.session_state.form_destination = ""
+
+@st.cache_data(ttl=600)
+def load_data():
+    sh = client.open(SHEET_NAME)
+    loads = pd.DataFrame(sh.worksheet("CARGAS").get_all_records())
+    settlements = pd.DataFrame(sh.worksheet("SETTLEMENTS").get_all_records())
+    deductions = pd.DataFrame(sh.worksheet("DEDUCTIONS").get_all_records())
+    drivers = pd.DataFrame(sh.worksheet("DRIVERS").get_all_records())
     
-    col1, col2, col3 = st.columns(3)
-    with col1:
-        if st.button("🚀 MJ7 Logistics"): st.session_state.pagina_actual = "MJ7"; st.rerun()
-    with col2:
-        if st.button("💰 Cuentas Corrientes"): st.session_state.pagina_actual = "CUENTAS"; st.rerun()
-    with col3:
-        if st.button("🏢 Módulo GCI"): st.session_state.pagina_actual = "GCI"; st.rerun()
+    # --- CONEXIÓN DE LAS 3 NUEVAS TABLAS DE AUDITORÍA ---
+    try:
+        expense_fin = pd.DataFrame(sh.worksheet("EXPENSE_FINANCIAMIENTOS").get_all_records())
+    except Exception:
+        expense_fin = pd.DataFrame(columns=["ID_FIN", "DRIVER", "TRUCK_ID", "CONCEPT", "TOTAL_TO_PAY", "INSTALLMENTS_PAID", "FRIDAY_1", "FRIDAY_2", "FRIDAY_3", "FRIDAY_4"])
 
-# --- MÓDULO MJ7 LOGISTICS ---
-elif st.session_state.pagina_actual == "MJ7":
-    if st.button("⬅️ Volver al Menú"): st.session_state.pagina_actual = "MENU"; st.rerun()
+    try:
+        truck_pay = pd.DataFrame(sh.worksheet("TRUCK_PAYMENTS").get_all_records())
+    except Exception:
+        truck_pay = pd.DataFrame(columns=["DRIVER", "TRUCK_ID", "TOTAL_VALUE", "WEEKLY_AMORTIZATION", "TOTAL_PAID", "START_DATE"])
+
+    try:
+        dispatch_track = pd.DataFrame(sh.worksheet("DISPATCH_TRACKER").get_all_records())
+    except Exception:
+        dispatch_track = pd.DataFrame(columns=["DATE", "MONTH", "CONCEPT", "AMOUNT", "TYPE"])
+    
+    for df in [loads, settlements, deductions]:
+        if "DATE" in df.columns: df["DATE"] = pd.to_datetime(df["DATE"], errors='coerce')
+        if "START_DATE" in df.columns: df["START_DATE"] = pd.to_datetime(df["START_DATE"], errors='coerce')
+        if "DELIVERY_DATE" in df.columns: df["DELIVERY_DATE"] = pd.to_datetime(df["DELIVERY_DATE"], errors='coerce')
+        
+    return loads, settlements, deductions, drivers, expense_fin, truck_pay, dispatch_track
+
+# Cargamos todos los datos (viejos y nuevos) en una sola llamada optimizada
+loads, settlements, deductions, drivers, expense_fin, truck_pay, dispatch_track = load_data()
+
+# ==================================================
+# ULTRA-PREMIUM CORPORATE VISUAL STYLES (TABLAS CORREGIDAS)
+# ==================================================
+st.markdown(
+"""
+<style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght=400;500;600;700&display=swap');
+    
+    /* Configuración Global */
+    html, body, [data-testid="stSidebar"] { 
+        font-family: 'Inter', sans-serif; 
+        background-color: #F8FAFC; 
+    }
+    
+    /* Forzar paleta de acentos a nivel raíz de Streamlit (Para barras de scroll y focos activos) */
+    :root {
+        --primary-color: #0047AB !important;
+        --secondary-backend-color: #0047AB !important;
+    }
+    
+    /* Sidebar Premium */
+    [data-testid="stSidebar"] { 
+        background-color: #0F172A !important; 
+        color: #F8FAFC !important; 
+        border-right: 1px solid #1E293B;
+    }
+    [data-testid="stSidebar"] h1, [data-testid="stSidebar"] span, [data-testid="stSidebar"] p { 
+        color: #E2E8F0 !important; 
+    }
+    
+    /* Títulos Principales */
+    h1 { 
+        color: #0F172A; 
+        font-weight: 700; 
+        letter-spacing: -0.03em; 
+        margin-bottom: 5px !important;
+    }
+    h2, h3 { 
+        color: #1E293B; 
+        font-weight: 600; 
+        letter-spacing: -0.02em; 
+    }
+    
+    /* Tarjetas de Métricas (MJ7 Profits) */
+    [data-testid="metric-container"] { 
+        background: #FFFFFF !important; 
+        padding: 24px 20px !important; 
+        border-radius: 12px !important; 
+        border: 1px solid #E2E8F0 !important; 
+        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.03) !important;
+        transition: transform 0.2s ease, box-shadow 0.2s ease;
+    }
+    [data-testid="metric-container"]:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.05), 0 4px 6px -2px rgba(0, 0, 0, 0.02) !important;
+    }
+    [data-testid="stMetricLabel"] { 
+        color: #64748B !important; 
+        font-weight: 600 !important; 
+        font-size: 0.8rem !important; 
+        text-transform: uppercase; 
+        letter-spacing: 0.05em;
+    }
+    [data-testid="stMetricValue"] { 
+        color: #0047AB !important; 
+        font-weight: 700 !important; 
+        font-size: 1.75rem !important; 
+        letter-spacing: -0.02em;
+    }
+    
+    /* Barra de Pestañas (Tabs) */
+    button[data-baseweb="tab"] {
+        font-family: 'Inter', sans-serif !important;
+        font-weight: 500 !important;
+        color: #64748B !important;
+        border-bottom-width: 3px !important;
+        border-bottom-color: transparent !important;
+        padding: 12px 18px !important;
+    }
+    button[data-baseweb="tab"]:hover {
+        color: #0F172A !important;
+    }
+    button[data-baseweb="tab"][aria-selected="true"] {
+        color: #0047AB !important; 
+        border-bottom-color: #0047AB !important;
+        font-weight: 600 !important;
+    }
+    [data-baseweb="tab-highlight-bar"] {
+        background-color: #0047AB !important;
+    }
+    
+    /* ==================================================
+       CORRECCIÓN TOTAL DE ESTILO PARA DATAFRAMES Y TABLAS
+       ================================================== */
+    [data-testid="stDataFrame"], [data-testid="stTable"], .stDataFrame {
+        background: #FFFFFF !important;
+        border: 1px solid #E2E8F0 !important;
+        border-radius: 12px !important;
+        padding: 6px !important;
+        box-shadow: 0 1px 3px rgba(0,0,0,0.02) !important;
+    }
+
+    /* Forzar que los encabezados internos de las celdas adopten fondo azul y letras claras */
+    div[data-testid="stDataFrame"] th, 
+    .stDataFrame table thead th,
+    div[data-baseweb="table-grid"] div[role="columnheader"] {
+        background-color: #0047AB !important;
+        color: #FFFFFF !important;
+        font-weight: 600 !important;
+    }
+
+    /* Cambiar el color de la barra horizontal inferior (scrollbar) al azul MJ7 */
+    ::-webkit-scrollbar-thumb {
+        background: #0047AB !important;
+        border-radius: 10px !important;
+    }
+    ::-webkit-scrollbar-track {
+        background: #F1F5F9 !important;
+    }
+    
+    /* Botones Globales */
+    .stButton button { 
+        background: #1E293B !important; 
+        color: #FFFFFF !important; 
+        border-radius: 8px !important; 
+        padding: 12px 24px !important; 
+        font-weight: 600 !important; 
+        border: none !important; 
+        width: 100%; 
+        transition: background 0.2s ease;
+    }
+    .stButton button:hover { 
+        background: #0F172A !important; 
+    }
+    
+    /* Tarjeta de rendimiento de choferes */
+    .performance-card-container {
+        background-color: #1E293B !important; 
+        border: 1px solid #334155 !important;
+        border-radius: 12px !important;
+        padding: 0px !important;
+        margin-bottom: 25px !important;
+        overflow: hidden !important;
+    }
+    .performance-card-header {
+        background-color: #0F172A !important;
+        border-bottom: 2px solid #38BDF8 !important;
+        padding: 15px 20px !important;
+        display: flex !important;
+        justify-content: space-between !important;
+        align-items: center !important;
+    }
+    .performance-card-header-text h4 {
+        color: #38BDF8 !important;
+        margin: 0 !important;
+        font-size: 1.15rem !important;
+        font-family: 'Inter', sans-serif !important;
+        letter-spacing: 0.5px !important;
+    }
+    .performance-card-header-text span {
+        color: #94A3B8 !important;
+        font-size: 0.8rem !important;
+    }
+    .performance-card-body {
+        padding: 20px !important;
+    }
+    .driver-meta-info {
+        font-size: 1rem !important;
+        color: #F8FAFC !important;
+        margin-bottom: 15px !important;
+    }
+    .performance-grid-layout {
+        display: grid !important;
+        grid-template-columns: repeat(3, 1fr) !important;
+        gap: 15px !important;
+    }
+    .perf-item-box {
+        background: #0F172A !important;
+        padding: 15px !important;
+        border-radius: 8px !important;
+        border: 1px solid #334155 !important;
+        text-align: center !important;
+    }
+    .perf-item-box.highlighted {
+        border: 1px solid #38BDF8 !important;
+    }
+    .perf-item-label {
+        font-size: 0.75rem !important;
+        color: #94A3B8 !important;
+        text-transform: uppercase !important;
+        letter-spacing: 0.5px !important;
+    }
+    .performance-card-body .perf-item-value {
+        font-size: 1.3rem !important;
+        font-weight: 700 !important;
+        color: #F8FAFC !important;
+        margin-top: 5px !important;
+    }
+
+    /* Estilos de las nuevas Tarjetas de Financiamiento Internas */
+    .financing-card-container {
+        background-color: #FFFFFF !important;
+        border: 1px solid #E2E8F0 !important;
+        border-radius: 12px !important;
+        padding: 24px !important;
+        margin-bottom: 20px !important;
+        box-shadow: 0 1px 3px rgba(0,0,0,0.02) !important;
+    }
+    .financing-card-header {
+        display: flex !important;
+        justify-content: space-between !important;
+        border-bottom: 1px solid #F1F5F9 !important;
+        padding-bottom: 14px !important;
+        align-items: center !important;
+    }
+    .financing-card-driver {
+        font-weight: 700 !important;
+        color: #0047AB !important;
+        font-size: 1.2rem !important;
+    }
+    .financing-card-meta {
+        color: #64748B !important;
+        font-size: 0.85rem !important;
+    }
+    .financing-card-id {
+        color: #475569 !important;
+        font-weight: 600 !important;
+        font-size: 0.9rem !important;
+    }
+    .financing-grid {
+        display: grid !important;
+        grid-template-columns: repeat(3, 1fr) !important;
+        gap: 20px !important;
+        margin-top: 20px !important;
+        text-align: center !important;
+    }
+    .financing-metric-label {
+        color: #64748B !important;
+        font-size: 0.75rem !important;
+        font-weight: 600 !important;
+        text-transform: uppercase !important;
+        letter-spacing: 0.05em;
+    }
+    .financing-metric-value {
+        color: #0F172A !important;
+        font-weight: 700 !important;
+        font-size: 1.5rem !important;
+        margin-top: 4px !important;
+    }
+    .financing-metric-value.highlighted {
+        color: #0047AB !important;
+    }
+    .financing-metric-sub {
+        color: #94A3B8 !important;
+        font-size: 0.75rem !important;
+        margin-top: 2px !important;
+    }
+    .financing-timeline {
+        margin-top: 20px !important;
+        background: #F8FAFC !important;
+        padding: 14px !important;
+        border-radius: 8px !important;
+        font-size: 0.85rem !important;
+        color: #475569 !important;
+        display: grid !important;
+        grid-template-columns: repeat(4, 1fr) !important;
+        text-align: center !important;
+        border: 1px solid #F1F5F9 !important;
+    }
+    .timeline-item {
+        border-right: 1px solid #E2E8F0 !important;
+    }
+    .timeline-item.last {
+        border-right: none !important;
+    }
+    .timeline-item.completed {
+        color: #94A3B8 !important;
+        text-decoration: line-through !important;
+    }
+    .timeline-item.pending {
+        font-weight: 600 !important;
+        color: #0F172A !important;
+    }
+</style>
+""",
+unsafe_allow_html=True
+)
+
+today = pd.Timestamp.today().normalize()
+
+st.sidebar.title("MJ7 OPERATIONS")
+st.sidebar.caption("Control Panel v4.5")
+
+# Header with Logo Alignment
+title_col, logo_col = st.columns([5, 1])
+with title_col:
     st.title("MJ7 Logistics Control Center")
-    # AQUI VA TU CÓDIGO DE MJ7 (La lógica, el CSS y las TABS que me pasaste antes)
-    st.info("Cargando módulo de logística...")
+    st.caption(f"Management Terminal | {datetime.now().strftime('%A, %d %B %Y')}")
+with logo_col:
+    try:
+        st.image("logo.jpeg", width=110)
+    except Exception:
+        pass
+st.divider()
 
+# MJ7 PROFITS METRICS
+# ==================================================
+if not settlements.empty:
+    settlements['DATE'] = pd.to_datetime(settlements['DATE'])
+    net_today = settlements[settlements['DATE'].dt.date == today.date()]['MJ7_NET'].sum()
+    net_week = settlements[settlements['DATE'] >= (today - timedelta(days=7))]['MJ7_NET'].sum()
+    net_month = settlements[settlements['DATE'].dt.month == today.month]['MJ7_NET'].sum()
+    net_year = settlements[settlements['DATE'].dt.year == today.year]['MJ7_NET'].sum()
+else:
+    net_today = net_week = net_month = net_year = 0.00
 
+st.markdown("### MJ7 Profits")
+k1, k2, k3, k4 = st.columns(4)
+k1.metric("Today", f"${net_today:,.2f}")
+k2.metric("This Week", f"${net_week:,.2f}")
+k3.metric("This Month", f"${net_month:,.2f}")
+k4.metric("This Year", f"${net_year:,.2f}")
+st.divider()
+
+# Aesthetic Gray Tabs via Streamlit Material Icons Syntax
+tabs = st.tabs([
+    ":material/insert_chart: Loads", 
+    ":material/payments: Settlements", 
+    ":material/trending_up: Performance", 
+    ":material/money_off: Deductions", 
+    ":material/edit_note: Data Entry", 
+    ":material/search: Search Engine", 
+    ":material/picture_as_pdf: PDF Reports",
+    ":material/gavel: Status Verification",
+    ":material/credit_score: Expense Financing",
+    ":material/local_shipping: Truck Payments",
+    ":material/pie_chart: Dispatch Tracker"
+])
 # TAB 1: LOADS
 with tabs[0]:
     st.subheader("General Loads Registry")
@@ -1150,16 +1514,3 @@ with tabs[10]:
         st.dataframe(df_display.sort_values(by=col_date, ascending=False), use_container_width=True)
     else:
         st.info("No historical entries recorded.")
-    
-elif st.session_state.pagina_actual == "CUENTAS":
-    if st.button("⬅️ Volver al Menú"): st.session_state.pagina_actual = "MENU"; st.rerun()
-    st.title("💰 Control de Cuentas Corrientes")
-    st.write("Interfaz para gestión de saldos, deudas y créditos.")
-    # Aquí puedes añadir las tablas o inputs de Cuentas Corrientes
-
-# --- MÓDULO GCI ---
-elif st.session_state.pagina_actual == "GCI":
-    if st.button("⬅️ Volver al Menú"): st.session_state.pagina_actual = "MENU"; st.rerun()
-    st.title("🏢 Módulo de Gestión GCI")
-    st.write("Interfaz para reportes y gestión corporativa interna.")
-    # Aquí puedes añadir los componentes específicos de GCI
