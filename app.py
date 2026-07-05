@@ -1440,109 +1440,67 @@ with tabs[9]:
 
 
 # ==================================================
-# TAB 10: ACCOUNTS PAYABLE / PERSON OBLIGATIONS
+# TAB 10: ACCOUNT CURRENT / PERSON OBLIGATIONS
 # ==================================================
 with tabs[10]:
     import plotly.express as px
 
-    st.subheader("External Accounts Payable Control")
-    st.caption("Manage business liabilities, tracking specific amounts owed to individuals or suppliers to eliminate double-payments.")
+    st.subheader("Personal Account Current (MJ7)")
+    st.caption("Manage employee/creditor balances. Credits add to their favor; Payments subtract.")
     
     col_p1, col_p2 = st.columns([1, 1])
     
     with col_p1:
-        with st.form("form_person_payments", clear_on_submit=True):
-            st.markdown("<h5 style='color:#1E293B; margin-bottom:15px;'>Record Obligation Payment / Update Debt</h5>", unsafe_allow_html=True)
+        with st.form("form_person_account", clear_on_submit=True):
+            st.markdown("<h5 style='color:#1E293B;'>Register Movement</h5>", unsafe_allow_html=True)
             
-            p_name = st.text_input("Creditor / Person Name (e.g., John Doe)").strip()
-            p_concept = st.text_input("Concept (e.g., Loan Settlement, Factoring Adjustment, Office Lease)").strip()
-            p_total_debt = st.number_input("Total Debt Value (USD)", min_value=0.0, step=100.0, value=0.0)
-            p_amount_paid = st.number_input("Amount Paid so far (USD)", min_value=0.0, step=50.0, value=0.0)
-            p_date = st.date_input("Transaction Log Date", datetime.today())
+            p_name = st.selectbox("Person", ["Ernesto Moran", "Other"])
+            p_type = st.radio("Movement Type", ["Credit / Commission (Saldo a favor)", "Payment / Abono (Débito)"])
+            p_concept = st.text_input("Concept (e.g., Weekly Dispatch)").strip()
+            p_amount = st.number_input("Amount (USD)", min_value=0.0, step=10.0, value=0.0)
+            p_date = st.date_input("Transaction Date", datetime.today())
 
-            btn_save_person = st.form_submit_button("Post / Update Obligation")
-            
-            if btn_save_person:
-                if not p_name or not p_concept or p_total_debt <= 0:
-                    st.error("Please provide a valid Person Name, Concept, and Total Debt.")
-                elif p_amount_paid > p_total_debt:
-                    st.error("Amount paid cannot exceed the total agreed debt value.")
+            if st.form_submit_button("Post Movement"):
+                if not p_concept or p_amount <= 0:
+                    st.error("Please provide a concept and an amount > 0.")
                 else:
                     try:
+                        # Si es pago, el valor se guarda negativo para restar al saldo
+                        valor_final = p_amount if "Credit" in p_type else -p_amount
+                        
                         ws_disp = client.open(SHEET_NAME).worksheet("DISPATCH_TRACKER")
-                        new_row = [
-                            p_date.strftime('%Y-%m-%d'),
-                            p_name, 
-                            p_concept,
-                            p_total_debt,
-                            p_amount_paid
-                        ]
-                        ws_disp.append_row(new_row)
-                        st.success(f"Ledger entry recorded for {p_name} successfully.")
+                        ws_disp.append_row([p_date.strftime('%Y-%m-%d'), p_name, p_concept, valor_final])
+                        st.success("Movement recorded successfully.")
                         st.cache_data.clear()
                         st.rerun()
                     except Exception as e:
-                        st.error(f"Database ledger sync error: {e}")
+                        st.error(f"Sync error: {e}")
 
     with col_p2:
-        st.markdown("<h5 style='color:#1E293B; margin-bottom:15px;'>Visual Liability Analytics</h5>", unsafe_allow_html=True)
+        st.markdown("<h5 style='color:#1E293B;'>Balance Evolution</h5>", unsafe_allow_html=True)
         
         if not dispatch_track.empty:
-            try:
-                df_debts = dispatch_track.copy()
-                df_debts = df_debts.iloc[:, :5]
-                df_debts.columns = ["DATE", "PERSON", "CONCEPT", "TOTAL_DEBT", "AMOUNT_PAID"]
+            df_acc = dispatch_track.iloc[:, :4].copy()
+            df_acc.columns = ["DATE", "PERSON", "CONCEPT", "AMOUNT"]
+            df_acc["AMOUNT"] = pd.to_numeric(df_acc["AMOUNT"], errors='coerce').fillna(0.0)
+            
+            # Filtro por persona
+            sel_person = st.selectbox("Select Person to View", df_acc["PERSON"].unique())
+            df_sel = df_acc[df_acc["PERSON"] == sel_person].sort_values("DATE")
+            
+            # Cálculo de saldo acumulado (Suma progresiva)
+            df_sel["BALANCE"] = df_sel["AMOUNT"].cumsum()
+            
+            if not df_sel.empty:
+                fig = px.line(df_sel, x="DATE", y="BALANCE", markers=True, title=f"Account Balance: {sel_person}")
+                fig.add_hline(y=0, line_dash="dash", line_color="red")
+                st.plotly_chart(fig, use_container_width=True)
                 
-                df_debts["TOTAL_DEBT"] = pd.to_numeric(df_debts["TOTAL_DEBT"], errors='coerce').fillna(0.0)
-                df_debts["AMOUNT_PAID"] = pd.to_numeric(df_debts["AMOUNT_PAID"], errors='coerce').fillna(0.0)
-                
-                global_total_debt = df_debts["TOTAL_DEBT"].sum()
-                global_total_paid = df_debts["AMOUNT_PAID"].sum()
-                global_remaining = max(0.0, global_total_debt - global_total_paid)
-                
-                if global_total_debt > 0:
-                    pie_data = pd.DataFrame({
-                        "Status": ["Total Paid", "Remaining Debt"],
-                        "Amount": [global_total_paid, global_remaining]
-                    })
-                    
-                    fig = px.pie(
-                        pie_data, 
-                        values="Amount", 
-                        names="Status", 
-                        color="Status",
-                        color_discrete_map={"Total Paid": "#10B981", "Remaining Debt": "#EF4444"},
-                        hole=0.4
-                    )
-                    fig.update_layout(margin=dict(t=10, b=10, l=10, r=10), height=230, showlegend=True)
-                    st.plotly_chart(fig, use_container_width=True)
-                    
-                    st.markdown(f"**Total Portfolio Indebtedness:** ${global_total_debt:,.2f} USD")
-                else:
-                    st.info("No numerical balance available to generate the chart.")
-            except Exception as e:
-                st.info("Awaiting formatted rows to display graph analytics.")
+                st.metric("Current Balance", f"${df_sel['BALANCE'].iloc[-1]:,.2f}")
         else:
-            st.info("No business liabilities tracked for the current cycle.")
+            st.info("No records found.")
             
     st.divider()
-    st.markdown("###### Detailed Obligations & Accounts Payable Ledger")
-    
+    st.markdown("###### Historical Ledger")
     if not dispatch_track.empty:
-        try:
-            st.dataframe(
-                df_debts.sort_values(by="DATE", ascending=False),
-                column_config={
-                    "DATE": st.column_config.DateColumn("Date"),
-                    "PERSON": "Creditor / Person",
-                    "CONCEPT": "Reason / Concept",
-                    "TOTAL_DEBT": st.column_config.NumberColumn("Total Debt (USD)", format="$%.2f"),
-                    "AMOUNT_PAID": st.column_config.NumberColumn("Paid to Date (USD)", format="$%.2f")
-                },
-                use_container_width=True,
-                hide_index=True
-            )
-        except:
-            st.dataframe(dispatch_track, use_container_width=True)
-    else:
-        st.info("No historical entries recorded.")
+        st.dataframe(dispatch_track.sort_values(by=0, ascending=False), use_container_width=True)
