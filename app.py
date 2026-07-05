@@ -1446,14 +1446,14 @@ with tabs[10]:
     import plotly.express as px
 
     st.subheader("Personal Account Current (MJ7)")
-    st.caption("Manage employee/creditor balances. Credits add to their favor; Payments subtract.")
+    st.caption("Track credits and payments for personnel and creditors.")
     
     col_p1, col_p2 = st.columns([1, 1])
     
+    # --- FORMULARIO DE REGISTRO ---
     with col_p1:
         with st.form("form_person_account", clear_on_submit=True):
             st.markdown("<h5 style='color:#1E293B;'>Register Movement</h5>", unsafe_allow_html=True)
-            
             p_name = st.selectbox("Person", ["Ernesto Moran", "Other"])
             p_type = st.radio("Movement Type", ["Credit / Commission (Saldo a favor)", "Payment / Abono (Débito)"])
             p_concept = st.text_input("Concept (e.g., Weekly Dispatch)").strip()
@@ -1465,9 +1465,7 @@ with tabs[10]:
                     st.error("Please provide a concept and an amount > 0.")
                 else:
                     try:
-                        # Si es pago, el valor se guarda negativo para restar al saldo
                         valor_final = p_amount if "Credit" in p_type else -p_amount
-                        
                         ws_disp = client.open(SHEET_NAME).worksheet("DISPATCH_TRACKER")
                         ws_disp.append_row([p_date.strftime('%Y-%m-%d'), p_name, p_concept, valor_final])
                         st.success("Movement recorded successfully.")
@@ -1476,31 +1474,43 @@ with tabs[10]:
                     except Exception as e:
                         st.error(f"Sync error: {e}")
 
+    # --- ANÁLISIS, TARJETA Y GRÁFICA ---
     with col_p2:
-        st.markdown("<h5 style='color:#1E293B;'>Balance Evolution</h5>", unsafe_allow_html=True)
-        
         if not dispatch_track.empty:
             df_acc = dispatch_track.iloc[:, :4].copy()
             df_acc.columns = ["DATE", "PERSON", "CONCEPT", "AMOUNT"]
             df_acc["AMOUNT"] = pd.to_numeric(df_acc["AMOUNT"], errors='coerce').fillna(0.0)
             
-            # Filtro por persona
             sel_person = st.selectbox("Select Person to View", df_acc["PERSON"].unique())
             df_sel = df_acc[df_acc["PERSON"] == sel_person].sort_values("DATE")
-            
-            # Cálculo de saldo acumulado (Suma progresiva)
             df_sel["BALANCE"] = df_sel["AMOUNT"].cumsum()
             
-            if not df_sel.empty:
-                fig = px.line(df_sel, x="DATE", y="BALANCE", markers=True, title=f"Account Balance: {sel_person}")
-                fig.add_hline(y=0, line_dash="dash", line_color="red")
-                st.plotly_chart(fig, use_container_width=True)
-                
-                st.metric("Current Balance", f"${df_sel['BALANCE'].iloc[-1]:,.2f}")
+            # Tarjeta de Saldo
+            saldo_final = df_sel["BALANCE"].iloc[-1]
+            color_saldo = "#10B981" if saldo_final >= 0 else "#EF4444"
+            st.markdown(f"""
+            <div style="background-color: #F8FAFC; padding: 15px; border-radius: 10px; border-left: 5px solid {color_saldo}; border: 1px solid #E2E8F0;">
+                <h5 style="margin:0; color:#64748B;">Current Balance: {sel_person}</h5>
+                <p style="margin:5px 0 0 0; font-size: 28px; font-weight: bold; color:{color_saldo};">${saldo_final:,.2f} USD</p>
+            </div>
+            """, unsafe_allow_html=True)
+            
+            st.write("")
+            # Gráfica de Líneas
+            fig = px.line(df_sel, x="DATE", y="BALANCE", markers=True, title=f"Account History: {sel_person}")
+            fig.add_hline(y=0, line_dash="dash", line_color="gray")
+            st.plotly_chart(fig, use_container_width=True)
         else:
-            st.info("No records found.")
+            st.info("No records found to display analytics.")
             
     st.divider()
-    st.markdown("###### Historical Ledger")
+    st.markdown("###### Detailed Historical Ledger")
+    
+    # --- TABLA HISTÓRICA ---
     if not dispatch_track.empty:
-        st.dataframe(dispatch_track.sort_values(by=0, ascending=False), use_container_width=True)
+        df_display = dispatch_track.copy()
+        # Usamos el nombre de la primera columna para evitar el KeyError
+        col_date = df_display.columns[0]
+        st.dataframe(df_display.sort_values(by=col_date, ascending=False), use_container_width=True)
+    else:
+        st.info("No historical entries recorded.")
