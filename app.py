@@ -1173,9 +1173,9 @@ with tabs[8]:
             f_interest_rate = st.slider("Interest Rate (%)", min_value=0, max_value=10, value=0)
             f_date_start = st.date_input("Agreement Date", datetime.today())
 
-            btn_save_financing = st.form_submit_button("Create Agreement")
+            f_submit = st.form_submit_button("Create Agreement")
             
-            if btn_save_financing:
+            if f_submit:
                 if not f_driver or f_base_amount <= 0:
                     st.error("Please provide a valid Driver Name and Base Amount.")
                 else:
@@ -1220,13 +1220,10 @@ with tabs[8]:
                 active_agreements = expense_fin[expense_fin["INSTALLMENTS_PAID"].astype(int) < 4]
                 
                 if not active_agreements.empty:
-                    # Crear una etiqueta clara para el selector: "Driver - Concept"
                     agreement_options = active_agreements.apply(lambda r: f"{r['DRIVER']} ({r['CONCEPT']}) | ID: {r['ID_FIN']}", axis=1).tolist()
                     selected_option = st.selectbox("Select Active Agreement", agreement_options)
                     
-                    # Extraer el ID único del acuerdo seleccionado
                     selected_id = selected_option.split("| ID: ")[1].strip()
-                    
                     st.caption("Each collection will advance the driver by 1 installment status (Max 4). Total debt remains fixed as agreed.")
                     btn_apply_installment = st.form_submit_button("Confirm & Apply Installment")
                     
@@ -1236,7 +1233,6 @@ with tabs[8]:
                             cell = ws_fin.find(selected_id)
                             row_idx = cell.row
                             
-                            # Obtener valor actual de pagos de la columna F (6) y sumarle 1
                             current_paid = int(ws_fin.cell(row_idx, 6).value or 0)
                             new_paid_count = min(current_paid + 1, 4)
                             
@@ -1253,13 +1249,14 @@ with tabs[8]:
 
     st.divider()
 
-    # --- SECCIÓN VISUAL DE AUDITORÍA (APLICA LAS CLASES CSS PREMIUM) ---
+    # --- SECCIÓN VISUAL DE AUDITORÍA DINÁMICA ---
     st.markdown("##### Active Agreements Status")
     
     if not expense_fin.empty:
         search_driver = st.selectbox("Filter by Driver Profile", ["All Active Drivers"] + list(expense_fin["DRIVER"].unique()))
-        
         df_display = expense_fin if search_driver == "All Active Drivers" else expense_fin[expense_fin["DRIVER"] == search_driver]
+
+        current_time_today = pd.Timestamp.today().normalize()
 
         for index, row in df_display.iterrows():
             total_val = float(row["TOTAL_TO_PAY"])
@@ -1267,11 +1264,17 @@ with tabs[8]:
             quota = total_val / 4
             current_debt = max(0.0, total_val - (paid_count * quota))
             
-            # Formatear las clases de cada viernes de forma dinámica según los pagos cobrados
-            t1_class = "completed" if paid_count >= 1 else "pending"
-            t2_class = "completed" if paid_count >= 2 else "pending"
-            t3_class = "completed" if paid_count >= 3 else "pending"
-            t4_class = "completed" if paid_count >= 4 else "pending"
+            # Conversión segura de fechas para auditoría automatizada
+            f1_dt = pd.to_datetime(row['FRIDAY_1'], errors='coerce')
+            f2_dt = pd.to_datetime(row['FRIDAY_2'], errors='coerce')
+            f3_dt = pd.to_datetime(row['FRIDAY_3'], errors='coerce')
+            f4_dt = pd.to_datetime(row['FRIDAY_4'], errors='coerce')
+            
+            # Lógica Dinámica Inteligente: Completado si ya se pagó la cuota correspondiente O si el calendario ya venció la fecha
+            t1_class = "completed" if paid_count >= 1 or (not pd.isna(f1_dt) and f1_dt < current_time_today) else "pending"
+            t2_class = "completed" if paid_count >= 2 or (not pd.isna(f2_dt) and f2_dt < current_time_today) else "pending"
+            t3_class = "completed" if paid_count >= 3 or (not pd.isna(f3_dt) and f3_dt < current_time_today) else "pending"
+            t4_class = "completed" if paid_count >= 4 or (not pd.isna(f4_dt) and f4_dt < current_time_today) else "pending"
             
             st.markdown(
                 f"""
@@ -1314,8 +1317,10 @@ with tabs[8]:
             )
     else:
         st.info("No active financing records found.")
-        # ==================================================
-# TAB 9: TRUCK PAYMENTS (MÓDULO DE FINANCIAMIENTO DE CAMIONES)
+
+
+# ==================================================
+# TAB 9: TRUCK PAYMENTS
 # ==================================================
 with tabs[9]:
     st.subheader("Truck Purchase & Financing Control")
@@ -1360,14 +1365,12 @@ with tabs[9]:
             with st.form("form_update_truck_pay", clear_on_submit=True):
                 st.markdown("<h5 style='color:#1E293B; margin-bottom:15px;'>Record Weekly Amortization Delivery</h5>", unsafe_allow_html=True)
                 
-                # Filtrar camiones que aún no se han pagado por completo
                 active_trucks = truck_pay[truck_pay["TOTAL_PAID"].astype(float) < truck_pay["TOTAL_VALUE"].astype(float)]
                 
                 if not active_trucks.empty:
                     truck_options = active_trucks.apply(lambda r: f"{r['DRIVER']} - Truck: {r['TRUCK_ID']}", axis=1).tolist()
                     selected_truck_opt = st.selectbox("Select Active Truck Ledger", truck_options)
                     
-                    # Extraer conductor y camión para buscar la fila exacta
                     sel_driver = selected_truck_opt.split(" - Truck: ")[0].strip()
                     sel_truck = selected_truck_opt.split(" - Truck: ")[1].strip()
                     
@@ -1377,8 +1380,6 @@ with tabs[9]:
                     if btn_apply_truck_pay:
                         try:
                             ws_truck = client.open(SHEET_NAME).worksheet("TRUCK_PAYMENTS")
-                            
-                            # Buscar la celda correcta haciendo match con el Camión o Conductor
                             cell = ws_truck.find(sel_truck)
                             row_idx = cell.row
                             
@@ -1411,7 +1412,6 @@ with tabs[9]:
             
             progress_pct = min(1.0, t_paid / t_val) if t_val > 0 else 0.0
             
-            # Formato de tarjeta premium idéntico al estilo corporativo inyectado
             st.markdown(
                 f"""
                 <div class="financing-card-container">
@@ -1431,7 +1431,7 @@ with tabs[9]:
                         </div>
                         <div>
                             <div class="financing-metric-label">Equity Delivered (Paid)</div>
-                            <div class="financing-metric-value">{t_paid:,.2f}</div>
+                            <div class="financing-metric-value">${t_paid:,.2f}</div>
                             <div class="financing-metric-sub">Progress: {progress_pct*100:.1f}%</div>
                         </div>
                         <div>
@@ -1444,14 +1444,13 @@ with tabs[9]:
                 """, 
                 unsafe_allow_html=True
             )
-            # Barra de progreso nativa alineada con el look corporativo
             st.progress(progress_pct)
     else:
         st.info("No active truck payments portfolios found.")
 
 
 # ==================================================
-# TAB 10: DISPATCH TRACKER (CONTROL DE IMPREVISTOS Y GASTOS OPERATIVOS)
+# TAB 10: DISPATCH TRACKER
 # ==================================================
 with tabs[10]:
     st.subheader("Dispatch Expense & Tracker Audit")
@@ -1477,7 +1476,7 @@ with tabs[10]:
                         ws_disp = client.open(SHEET_NAME).worksheet("DISPATCH_TRACKER")
                         new_row = [
                             d_date.strftime('%Y-%m-%d'),
-                            d_date.strftime('%B'), # Guarda el mes automáticamente
+                            d_date.strftime('%B'), 
                             d_concept,
                             d_amount,
                             d_type
@@ -1495,13 +1494,11 @@ with tabs[10]:
         if not dispatch_track.empty:
             dispatch_track["AMOUNT"] = dispatch_track["AMOUNT"].astype(float)
             
-            # Cálculos rápidos de flujos
             total_inflows = dispatch_track[dispatch_track["TYPE"] == "DISPATCH_FEE_INFLOW"]["AMOUNT"].sum()
             total_outflows = dispatch_track[dispatch_track["TYPE"] == "OPERATIONAL_EXPENSE"]["AMOUNT"].sum()
             total_advances = dispatch_track[dispatch_track["TYPE"] == "EMERGENCY_ADVANCE"]["AMOUNT"].sum()
             net_cash_flow = total_inflows - total_outflows - total_advances
             
-            # Métricas en formato limpio de tarjetas pequeñas
             m1, m2, m3 = st.columns(3)
             m1.metric("Inflows (Fees)", f"${total_inflows:,.2f}")
             m2.metric("Outflows (Expenses)", f"${total_outflows:,.2f}")
@@ -1509,7 +1506,6 @@ with tabs[10]:
             
             st.divider()
             
-            # Tabla interactiva con formato premium usando las bondades de Streamlit
             st.markdown("###### Detailed Transactions Ledger")
             st.dataframe(
                 dispatch_track.sort_values(by="DATE", ascending=False),
