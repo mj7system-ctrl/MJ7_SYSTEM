@@ -1154,7 +1154,7 @@ with tabs[7]:
     else:
         st.info("No se encontraron registros de operaciones activos para el análisis de estatus.")
 # ==================================================
-# TAB 8: EXPENSE FINANCING (100% INDEPENDENT)
+# TAB 8: EXPENSE FINANCING (CORREGIDO SIN ERRORES DE FORM)
 # ==================================================
 with tabs[8]:
     st.subheader("Expense Financing Control")
@@ -1209,37 +1209,42 @@ with tabs[8]:
                         st.error(f"Database sync error: {e}")
 
     with col_action2:
+        st.markdown("<h5 style='color:#1E293B; margin-bottom:15px;'>Record Collection Payment</h5>", unsafe_allow_html=True)
+        
+        # EL CONDICIONAL SE QUEDA FUERA: Si no hay datos, no creamos el formulario para evitar el error de "Missing Submit Button"
         if not expense_fin.empty:
-            with st.form("form_update_installment", clear_on_submit=True):
-                st.markdown("<h5 style='color:#1E293B; margin-bottom:15px;'>Record Installment Collection</h5>", unsafe_allow_html=True)
-                
-                active_agreements = expense_fin[expense_fin["INSTALLMENTS_PAID"].astype(int) < 4]
-                
-                if not active_agreements.empty:
+            active_agreements = expense_fin[expense_fin["INSTALLMENTS_PAID"].astype(float) < expense_fin["TOTAL_TO_PAY"].astype(float)]
+            
+            if not active_agreements.empty:
+                with st.form("form_update_installment", clear_on_submit=True):
                     agreement_options = active_agreements.apply(lambda r: f"{r['DRIVER']} ({r['CONCEPT']}) | ID: {r['ID_FIN']}", axis=1).tolist()
                     selected_option = st.selectbox("Select Active Agreement", agreement_options)
-                    
                     selected_id = selected_option.split("| ID: ")[1].strip()
-                    st.caption("Each collection will advance the driver by 1 installment status (Max 4). Total debt remains fixed as agreed.")
-                    btn_apply_installment = st.form_submit_button("Confirm & Apply Installment")
+                    
+                    custom_fin_payment = st.number_input("Amount to Collect (USD)", min_value=0.0, step=50.0, value=0.0)
+                    btn_apply_installment = st.form_submit_button("Confirm & Apply Collection")
                     
                     if btn_apply_installment:
-                        try:
-                            ws_fin = client.open(SHEET_NAME).worksheet("EXPENSE_FINANCIAMIENTOS")
-                            cell = ws_fin.find(selected_id)
-                            row_idx = cell.row
-                            
-                            current_paid = int(ws_fin.cell(row_idx, 6).value or 0)
-                            new_paid_count = min(current_paid + 1, 4)
-                            
-                            ws_fin.update_cell(row_idx, 6, new_paid_count)
-                            st.success(f"Installment collection updated to {new_paid_count} of 4.")
-                            st.cache_data.clear()
-                            st.rerun()
-                        except Exception as e:
-                            st.error(f"Error updating ledger: {e}")
-                else:
-                    st.info("All registered financing agreements are fully paid.")
+                        if custom_fin_payment <= 0:
+                            st.error("Please enter an amount greater than 0.")
+                        else:
+                            try:
+                                ws_fin = client.open(SHEET_NAME).worksheet("EXPENSE_FINANCIAMIENTOS")
+                                cell = ws_fin.find(selected_id)
+                                row_idx = cell.row
+                                
+                                current_paid = float(ws_fin.cell(row_idx, 6).value or 0.0)
+                                total_value = float(ws_fin.cell(row_idx, 5).value or 0.0)
+                                new_paid_total = min(current_paid + custom_fin_payment, total_value)
+                                
+                                ws_fin.update_cell(row_idx, 6, new_paid_total)
+                                st.success(f"Collection applied! Total registered: ${new_paid_total:,.2f} of ${total_value:,.2f}")
+                                st.cache_data.clear()
+                                st.rerun()
+                            except Exception as e:
+                                st.error(f"Error updating ledger: {e}")
+            else:
+                st.info("All registered financing agreements are fully paid.")
         else:
             st.info("No records available to update yet.")
 
@@ -1254,19 +1259,18 @@ with tabs[8]:
 
         for index, row in df_display.iterrows():
             total_val = float(row["TOTAL_TO_PAY"])
-            paid_count = int(row["INSTALLMENTS_PAID"])
-            quota = total_val / 4
-            current_debt = max(0.0, total_val - (paid_count * quota))
+            paid_amount = float(row["INSTALLMENTS_PAID"])
+            current_debt = max(0.0, total_val - paid_amount)
             
             f1_dt = pd.to_datetime(row['FRIDAY_1'], errors='coerce')
             f2_dt = pd.to_datetime(row['FRIDAY_2'], errors='coerce')
             f3_dt = pd.to_datetime(row['FRIDAY_3'], errors='coerce')
             f4_dt = pd.to_datetime(row['FRIDAY_4'], errors='coerce')
             
-            t1_class = "completed" if paid_count >= 1 or (not pd.isna(f1_dt) and f1_dt < current_time_today) else "pending"
-            t2_class = "completed" if paid_count >= 2 or (not pd.isna(f2_dt) and f2_dt < current_time_today) else "pending"
-            t3_class = "completed" if paid_count >= 3 or (not pd.isna(f3_dt) and f3_dt < current_time_today) else "pending"
-            t4_class = "completed" if paid_count >= 4 or (not pd.isna(f4_dt) and f4_dt < current_time_today) else "pending"
+            t1_class = "completed" if paid_amount >= (total_val * 0.25) or (not pd.isna(f1_dt) and f1_dt < current_time_today) else "pending"
+            t2_class = "completed" if paid_amount >= (total_val * 0.50) or (not pd.isna(f2_dt) and f2_dt < current_time_today) else "pending"
+            t3_class = "completed" if paid_amount >= (total_val * 0.75) or (not pd.isna(f3_dt) and f3_dt < current_time_today) else "pending"
+            t4_class = "completed" if paid_amount >= total_val or (not pd.isna(f4_dt) and f4_dt < current_time_today) else "pending"
             
             card_html = f"""
 <div class="financing-card-container">
@@ -1281,17 +1285,17 @@ with tabs[8]:
         <div>
             <div class="financing-metric-label">Total Financed (Fixed)</div>
             <div class="financing-metric-value">${total_val:,.2f}</div>
-            <div class="financing-metric-sub">4 installments of ${quota:,.2f}</div>
+            <div class="financing-metric-sub">Concept: {row['CONCEPT']}</div>
         </div>
         <div>
-            <div class="financing-metric-label">Installments Collected</div>
-            <div class="financing-metric-value">{paid_count} <span style="color: #94A3B8; font-size: 1rem; font-weight: 400;">/ 4</span></div>
-            <div class="financing-metric-sub">Status: {"Complete" if paid_count == 4 else "Active"}</div>
+            <div class="financing-metric-label">Total Collected</div>
+            <div class="financing-metric-value">${paid_amount:,.2f}</div>
+            <div class="financing-metric-sub">Progress: {(paid_amount/total_val)*100:.1f}%</div>
         </div>
         <div>
             <div class="financing-metric-label">Remaining Balance</div>
             <div class="financing-metric-value highlighted">${current_debt:,.2f}</div>
-            <div class="financing-metric-sub">Concept: {row['CONCEPT']}</div>
+            <div class="financing-metric-sub">Status: {"Complete" if current_debt == 0 else "Active"}</div>
         </div>
     </div>
     <div class="financing-timeline">
@@ -1307,7 +1311,7 @@ with tabs[8]:
 
 
 # ==================================================
-# TAB 9: TRUCK PAYMENTS (FLEXIBLE VERSION)
+# TAB 9: TRUCK PAYMENTS (CORREGIDO SIN ERRORES DE FORM)
 # ==================================================
 with tabs[9]:
     st.subheader("Truck Purchase & Financing Control")
@@ -1348,62 +1352,45 @@ with tabs[9]:
                         st.error(f"Database sync error: {e}")
 
     with col_truck2:
+        st.markdown("<h5 style='color:#1E293B; margin-bottom:15px;'>Record Weekly Amortization Delivery</h5>", unsafe_allow_html=True)
+        
+        # EL CONDICIONAL SE QUEDA FUERA: Protege contra formularios vacíos sin botón de envío
         if not truck_pay.empty:
-            with st.form("form_update_truck_pay", clear_on_submit=True):
-                st.markdown("<h5 style='color:#1E293B; margin-bottom:15px;'>Record Weekly Amortization Delivery</h5>", unsafe_allow_html=True)
-                
-                active_trucks = truck_pay[truck_pay["TOTAL_PAID"].astype(float) < truck_pay["TOTAL_VALUE"].astype(float)]
-                
-                if not active_trucks.empty:
+            active_trucks = truck_pay[truck_pay["TOTAL_PAID"].astype(float) < truck_pay["TOTAL_VALUE"].astype(float)]
+            
+            if not active_trucks.empty:
+                with st.form("form_update_truck_pay", clear_on_submit=True):
                     truck_options = active_trucks.apply(lambda r: f"{r['DRIVER']} - Truck: {r['TRUCK_ID']}", axis=1).tolist()
                     selected_truck_opt = st.selectbox("Select Active Truck Ledger", truck_options)
                     
                     sel_driver = selected_truck_opt.split(" - Truck: ")[0].strip()
                     sel_truck = selected_truck_opt.split(" - Truck: ")[1].strip()
                     
-                    # BLINDAJE ANTI-CRASH: Validamos si el filtro genera registros reales antes de usar .iloc[0]
-                    matched_filter = active_trucks[(active_trucks["DRIVER"] == sel_driver) & (active_trucks["TRUCK_ID"] == sel_truck)]
+                    custom_payment = st.number_input("Amount to Pay (USD)", min_value=0.0, step=50.0, value=0.0)
+                    st.caption("Applying this record will add the specified amount to the driver's total equity portfolio.")
+                    btn_apply_truck_pay = st.form_submit_button("Confirm & Apply Payment")
                     
-                    if not matched_filter.empty:
-                        matched_row = matched_filter.iloc[0]
-                        default_weekly_rate = float(matched_row["WEEKLY_AMORTIZATION"] or 0.0)
-                        
-                        st.markdown("<p style='margin-bottom:2px; font-size:14px; color:#475569;'>Amount to Pay (USD)</p>", unsafe_allow_html=True)
-                        custom_payment = st.number_input(
-                            "Amount to Pay (USD)", 
-                            min_value=0.0, 
-                            step=50.0, 
-                            value=default_weekly_rate,
-                            label_visibility="collapsed"
-                        )
-                        
-                        st.caption("Applying this record will add the specified amount to the driver's total equity.")
-                        btn_apply_truck_pay = st.form_submit_button("Confirm & Apply Payment")
-                        
-                        if btn_apply_truck_pay:
-                            if custom_payment <= 0:
-                                st.error("Please enter a valid payment amount greater than 0.")
-                            else:
-                                try:
-                                    ws_truck = client.open(SHEET_NAME).worksheet("TRUCK_PAYMENTS")
-                                    cell = ws_truck.find(sel_truck)
-                                    row_idx = cell.row
-                                    
-                                    current_paid = float(ws_truck.cell(row_idx, 5).value or 0.0)
-                                    total_value = float(ws_truck.cell(row_idx, 3).value or 0.0)
-                                    
-                                    new_paid_total = min(current_paid + custom_payment, total_value)
-                                    
-                                    ws_truck.update_cell(row_idx, 5, new_paid_total)
-                                    st.success(f"Payment applied. Total paid updated to ${new_paid_total:,.2f} of ${total_value:,.2f}")
-                                    st.cache_data.clear()
-                                    st.rerun()
-                                except Exception as e:
-                                    st.error(f"Error updating truck balance: {e}")
-                    else:
-                        st.error("Error retrieving row details. Please clear cache.")
-                else:
-                    st.info("All registered trucks are fully paid and owned.")
+                    if btn_apply_truck_pay:
+                        if custom_payment <= 0:
+                            st.error("Please enter a valid payment amount greater than 0.")
+                        else:
+                            try:
+                                ws_truck = client.open(SHEET_NAME).worksheet("TRUCK_PAYMENTS")
+                                cell = ws_truck.find(sel_truck)
+                                row_idx = cell.row
+                                
+                                current_paid = float(ws_truck.cell(row_idx, 5).value or 0.0)
+                                total_value = float(ws_truck.cell(row_idx, 3).value or 0.0)
+                                new_paid_total = min(current_paid + custom_payment, total_value)
+                                
+                                ws_truck.update_cell(row_idx, 5, new_paid_total)
+                                st.success(f"Payment applied! Total paid updated to ${new_paid_total:,.2f} of ${total_value:,.2f}")
+                                st.cache_data.clear()
+                                st.rerun()
+                            except Exception as e:
+                                st.error(f"Error updating truck balance: {e}")
+            else:
+                st.info("All registered trucks are fully paid and owned.")
         else:
             st.info("No truck financing records available yet.")
 
@@ -1432,7 +1419,7 @@ with tabs[9]:
         <div>
             <div class="financing-metric-label">Total Asset Value</div>
             <div class="financing-metric-value">${t_val:,.2f}</div>
-            <div class="financing-metric-sub">Base Rate: ${t_rate:,.2f} / wk</div>
+            <div class="financing-metric-sub">Base Amortization Rate: ${t_rate:,.2f} / wk</div>
         </div>
         <div>
             <div class="financing-metric-label">Equity Delivered (Paid)</div>
@@ -1502,10 +1489,7 @@ with tabs[10]:
         
         if not dispatch_track.empty:
             try:
-                # Copiar y asignar nombres seguros para procesar los datos de deudas independientemente de las columnas antiguas
                 df_debts = dispatch_track.copy()
-                
-                # Forzar que tome las primeras 5 columnas mapeadas para evitar conflictos de nombres
                 df_debts = df_debts.iloc[:, :5]
                 df_debts.columns = ["DATE", "PERSON", "CONCEPT", "TOTAL_DEBT", "AMOUNT_PAID"]
                 
