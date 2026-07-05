@@ -71,7 +71,7 @@ def load_data():
 loads, settlements, deductions, drivers, expense_fin, truck_pay, dispatch_track = load_data()
 
 # ==================================================
-# ULTRA-PREMIUM CORPORATE VISUAL STYLES
+# ULTRA-PREMIUM CORPORATE VISUAL STYLES (TABLAS CORREGIDAS)
 # ==================================================
 st.markdown(
 """
@@ -84,9 +84,10 @@ st.markdown(
         background-color: #F8FAFC; 
     }
     
-    /* Forzar que CUALQUIER elemento de acento, línea de carga o selección use el azul MJ7 en vez de naranja/rojo */
+    /* Forzar paleta de acentos a nivel raíz de Streamlit (Para barras de scroll y focos activos) */
     :root {
         --primary-color: #0047AB !important;
+        --secondary-backend-color: #0047AB !important;
     }
     
     /* Sidebar Premium */
@@ -112,7 +113,7 @@ st.markdown(
         letter-spacing: -0.02em; 
     }
     
-    /* Rediseño de Tarjetas de Métricas (MJ7 Profits con sombras y hover) */
+    /* Tarjetas de Métricas (MJ7 Profits) */
     [data-testid="metric-container"] { 
         background: #FFFFFF !important; 
         padding: 24px 20px !important; 
@@ -139,7 +140,7 @@ st.markdown(
         letter-spacing: -0.02em;
     }
     
-    /* Estilización total de la Barra de Pestañas (Tabs) e inyección del azul corporativo */
+    /* Barra de Pestañas (Tabs) */
     button[data-baseweb="tab"] {
         font-family: 'Inter', sans-serif !important;
         font-weight: 500 !important;
@@ -156,19 +157,37 @@ st.markdown(
         border-bottom-color: #0047AB !important;
         font-weight: 600 !important;
     }
-    
-    /* Eliminar cualquier línea residual naranja en las pestañas */
     [data-baseweb="tab-highlight-bar"] {
         background-color: #0047AB !important;
     }
     
-    /* DISEÑO PREMIUM PARA LAS TABLAS (DATAFRAMES Y TABLAS INTERACTIVAS) */
-    [data-testid="stDataFrame"], [data-testid="stTable"] {
+    /* ==================================================
+       CORRECCIÓN TOTAL DE ESTILO PARA DATAFRAMES Y TABLAS
+       ================================================== */
+    [data-testid="stDataFrame"], [data-testid="stTable"], .stDataFrame {
         background: #FFFFFF !important;
         border: 1px solid #E2E8F0 !important;
         border-radius: 12px !important;
-        padding: 10px !important;
+        padding: 6px !important;
         box-shadow: 0 1px 3px rgba(0,0,0,0.02) !important;
+    }
+
+    /* Forzar que los encabezados internos de las celdas adopten fondo azul y letras claras */
+    div[data-testid="stDataFrame"] th, 
+    .stDataFrame table thead th,
+    div[data-baseweb="table-grid"] div[role="columnheader"] {
+        background-color: #0047AB !important;
+        color: #FFFFFF !important;
+        font-weight: 600 !important;
+    }
+
+    /* Cambiar el color de la barra horizontal inferior (scrollbar) al azul MJ7 */
+    ::-webkit-scrollbar-thumb {
+        background: #0047AB !important;
+        border-radius: 10px !important;
+    }
+    ::-webkit-scrollbar-track {
+        background: #F1F5F9 !important;
     }
     
     /* Botones Globales */
