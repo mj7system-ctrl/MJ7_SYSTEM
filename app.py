@@ -45,13 +45,31 @@ def load_data():
     deductions = pd.DataFrame(sh.worksheet("DEDUCTIONS").get_all_records())
     drivers = pd.DataFrame(sh.worksheet("DRIVERS").get_all_records())
     
+    # --- CONEXIÓN DE LAS 3 NUEVAS TABLAS DE AUDITORÍA ---
+    try:
+        expense_fin = pd.DataFrame(sh.worksheet("EXPENSE_FINANCIAMIENTOS").get_all_records())
+    except Exception:
+        expense_fin = pd.DataFrame(columns=["ID_FIN", "DRIVER", "TRUCK_ID", "CONCEPT", "TOTAL_TO_PAY", "INSTALLMENTS_PAID", "FRIDAY_1", "FRIDAY_2", "FRIDAY_3", "FRIDAY_4"])
+
+    try:
+        truck_pay = pd.DataFrame(sh.worksheet("TRUCK_PAYMENTS").get_all_records())
+    except Exception:
+        truck_pay = pd.DataFrame(columns=["DRIVER", "TRUCK_ID", "TOTAL_VALUE", "WEEKLY_AMORTIZATION", "TOTAL_PAID", "START_DATE"])
+
+    try:
+        dispatch_track = pd.DataFrame(sh.worksheet("DISPATCH_TRACKER").get_all_records())
+    except Exception:
+        dispatch_track = pd.DataFrame(columns=["DATE", "MONTH", "CONCEPT", "AMOUNT", "TYPE"])
+    
     for df in [loads, settlements, deductions]:
         if "DATE" in df.columns: df["DATE"] = pd.to_datetime(df["DATE"], errors='coerce')
         if "START_DATE" in df.columns: df["START_DATE"] = pd.to_datetime(df["START_DATE"], errors='coerce')
         if "DELIVERY_DATE" in df.columns: df["DELIVERY_DATE"] = pd.to_datetime(df["DELIVERY_DATE"], errors='coerce')
-    return loads, settlements, deductions, drivers
-# Cargamos datos una sola vez
-loads, settlements, deductions, drivers = load_data()
+        
+    return loads, settlements, deductions, drivers, expense_fin, truck_pay, dispatch_track
+
+# Cargamos todos los datos (viejos y nuevos) en una sola llamada optimizada
+loads, settlements, deductions, drivers, expense_fin, truck_pay, dispatch_track = load_data()
 
 # ==================================================
 # CLEAN VISUAL STYLES
@@ -137,6 +155,93 @@ st.markdown(
         color: #F8FAFC !important;
         margin-top: 5px !important;
     }
+
+    /* ==================================================
+       NUEVOS ESTILOS CORPORATIVOS COMPATIBLES
+       ================================================== */
+    .financing-card-container {
+        background-color: #FFFFFF !important;
+        border: 1px solid #E2E8F0 !important;
+        border-radius: 8px !important;
+        padding: 22px !important;
+        margin-bottom: 18px !important;
+        box-shadow: 0 1px 3px rgba(0,0,0,0.02) !important;
+    }
+    .financing-card-header {
+        display: flex !important;
+        justify-content: space-between !important;
+        border-bottom: 1px solid #F1F5F9 !important;
+        padding-bottom: 12px !important;
+        align-items: center !important;
+    }
+    .financing-card-driver {
+        font-weight: 700 !important;
+        color: #0047AB !important;
+        font-size: 1.15rem !important;
+    }
+    .financing-card-meta {
+        color: #64748B !important;
+        font-size: 0.85rem !important;
+    }
+    .financing-card-id {
+        color: #475569 !important;
+        font-weight: 600 !important;
+        font-size: 0.9rem !important;
+    }
+    .financing-grid {
+        display: grid !important;
+        grid-template-columns: repeat(3, 1fr) !important;
+        gap: 20px !important;
+        margin-top: 18px !important;
+        text-align: center !important;
+    }
+    .financing-metric-label {
+        color: #64748B !important;
+        font-size: 0.72rem !important;
+        font-weight: 600 !important;
+        text-transform: uppercase !important;
+        letter-spacing: 0.5px !important;
+    }
+    .financing-metric-value {
+        color: #0F172A !important;
+        font-weight: 700 !important;
+        font-size: 1.4rem !important;
+        margin-top: 4px !important;
+    }
+    .financing-metric-value.highlighted {
+        color: #0047AB !important;
+    }
+    .financing-metric-sub {
+        color: #94A3B8 !important;
+        font-size: 0.75rem !important;
+        margin-top: 2px !important;
+    }
+    .financing-timeline {
+        margin-top: 18px !important;
+        background: #F8FAFC !important;
+        padding: 12px !important;
+        border-radius: 6px !important;
+        font-size: 0.8rem !important;
+        color: #475569 !important;
+        display: grid !important;
+        grid-template-columns: repeat(4, 1fr) !important;
+        text-align: center !important;
+        border: 1px solid #F1F5F9 !important;
+    }
+    .timeline-item {
+        border-right: 1px solid #E2E8F0 !important;
+    }
+    .timeline-item.last {
+        border-right: none !important;
+    }
+    .timeline-item.completed {
+        color: #94A3B8 !important;
+        text-decoration: line-through !important;
+    }
+    .timeline-item.pending {
+        font-weight: 600 !important;
+        color: #0F172A !important;
+    }
 </style>
 """,
 unsafe_allow_html=True
@@ -159,7 +264,6 @@ with logo_col:
         pass
 st.divider()
 
-#PARTE 2 DE 4 
 # MJ7 PROFITS METRICS
 # ==================================================
 if not settlements.empty:
@@ -188,7 +292,10 @@ tabs = st.tabs([
     ":material/edit_note: Data Entry", 
     ":material/search: Search Engine", 
     ":material/picture_as_pdf: PDF Reports",
-    ":material/gavel: Status Verification"
+    ":material/gavel: Status Verification",
+    ":material/credit_score: Expense Financing",
+    ":material/local_shipping: Truck Payments",
+    ":material/pie_chart: Dispatch Tracker"
 ])
 
 # TAB 1: LOADS
@@ -936,3 +1043,375 @@ with tabs[7]:
             st.success("El sistema no detecta demoras ni servicios pendientes de liquidación para el día de hoy.")
     else:
         st.info("No se encontraron registros de operaciones activos para el análisis de estatus.")
+# ==================================================
+# TAB 8: EXPENSE FINANCING (100% INDEPENDENT)
+# ==================================================
+with tabs[8]:
+    st.subheader("Expense Financing Control")
+    st.caption("Internal corporate program to manage driver loans for maintenance and parts with custom financing rates.")
+    
+    # Grid de dos columnas: Izquierda para registro, Derecha para actualización rápida
+    col_action1, col_action2 = st.columns(2)
+    
+    with col_action1:
+        with st.form("form_expense_financing", clear_on_submit=True):
+            st.markdown("<h5 style='color:#1E293B; margin-bottom:15px;'>New Financing Agreement</h5>", unsafe_allow_html=True)
+            f_driver = st.text_input("Driver Name").strip()
+            f_truck = st.text_input("Truck ID / Number").strip()
+            f_concept = st.selectbox("Expense Concept", ["Tires", "Engine / Transmission", "Major Repair", "Insurance Deductible", "Other"])
+            f_base_amount = st.number_input("Base Amount (USD)", min_value=0.0, step=100.0, value=0.0)
+            f_interest_rate = st.slider("Interest Rate (%)", min_value=0, max_value=10, value=0)
+            f_date_start = st.date_input("Agreement Date", datetime.today())
+
+            btn_save_financing = st.form_submit_button("Create Agreement")
+            
+            if btn_save_financing:
+                if not f_driver or f_base_amount <= 0:
+                    st.error("Please provide a valid Driver Name and Base Amount.")
+                else:
+                    total_to_pay = f_base_amount * (1 + (f_interest_rate / 100))
+                    
+                    # Proyección automática de los 4 viernes consecutivos
+                    fridays = []
+                    current_date = pd.to_datetime(f_date_start)
+                    while len(fridays) < 4:
+                        current_date += timedelta(days=1)
+                        if current_date.weekday() == 4:  # 4 es Viernes en Python
+                            fridays.append(current_date.strftime('%Y-%m-%d'))
+                    
+                    try:
+                        ws_fin = client.open(SHEET_NAME).worksheet("EXPENSE_FINANCIAMIENTOS")
+                        new_row = [
+                            f"FIN-{int(datetime.now().timestamp())}",
+                            f_driver,
+                            f_truck,
+                            f_concept,
+                            total_to_pay,
+                            0,  # INSTALLMENTS_PAID inicia en 0
+                            fridays[0],
+                            fridays[1],
+                            fridays[2],
+                            fridays[3]
+                        ]
+                        ws_fin.append_row(new_row)
+                        st.success(f"Financing agreement for {f_driver} generated successfully.")
+                        st.cache_data.clear()
+                        st.rerun()
+                    except Exception as e:
+                        st.error(f"Database sync error: {e}")
+
+    with col_action2:
+        # Panel de control manual para registrar abonos sobre la marcha
+        if not expense_fin.empty:
+            with st.form("form_update_installment", clear_on_submit=True):
+                st.markdown("<h5 style='color:#1E293B; margin-bottom:15px;'>Record Installment Collection</h5>", unsafe_allow_html=True)
+                
+                # Buscamos solo los acuerdos que tengan menos de 4 pagos realizados
+                active_agreements = expense_fin[expense_fin["INSTALLMENTS_PAID"].astype(int) < 4]
+                
+                if not active_agreements.empty:
+                    # Crear una etiqueta clara para el selector: "Driver - Concept"
+                    agreement_options = active_agreements.apply(lambda r: f"{r['DRIVER']} ({r['CONCEPT']}) | ID: {r['ID_FIN']}", axis=1).tolist()
+                    selected_option = st.selectbox("Select Active Agreement", agreement_options)
+                    
+                    # Extraer el ID único del acuerdo seleccionado
+                    selected_id = selected_option.split("| ID: ")[1].strip()
+                    
+                    st.caption("Each collection will advance the driver by 1 installment status (Max 4). Total debt remains fixed as agreed.")
+                    btn_apply_installment = st.form_submit_button("Confirm & Apply Installment")
+                    
+                    if btn_apply_installment:
+                        try:
+                            ws_fin = client.open(SHEET_NAME).worksheet("EXPENSE_FINANCIAMIENTOS")
+                            cell = ws_fin.find(selected_id)
+                            row_idx = cell.row
+                            
+                            # Obtener valor actual de pagos de la columna F (6) y sumarle 1
+                            current_paid = int(ws_fin.cell(row_idx, 6).value or 0)
+                            new_paid_count = min(current_paid + 1, 4)
+                            
+                            ws_fin.update_cell(row_idx, 6, new_paid_count)
+                            st.success(f"Installment collection updated to {new_paid_count} of 4.")
+                            st.cache_data.clear()
+                            st.rerun()
+                        except Exception as e:
+                            st.error(f"Error updating ledger: {e}")
+                else:
+                    st.info("All registered financing agreements are fully paid.")
+        else:
+            st.info("No records available to update yet.")
+
+    st.divider()
+
+    # --- SECCIÓN VISUAL DE AUDITORÍA (APLICA LAS CLASES CSS PREMIUM) ---
+    st.markdown("##### Active Agreements Status")
+    
+    if not expense_fin.empty:
+        search_driver = st.selectbox("Filter by Driver Profile", ["All Active Drivers"] + list(expense_fin["DRIVER"].unique()))
+        
+        df_display = expense_fin if search_driver == "All Active Drivers" else expense_fin[expense_fin["DRIVER"] == search_driver]
+
+        for index, row in df_display.iterrows():
+            total_val = float(row["TOTAL_TO_PAY"])
+            paid_count = int(row["INSTALLMENTS_PAID"])
+            quota = total_val / 4
+            current_debt = max(0.0, total_val - (paid_count * quota))
+            
+            # Formatear las clases de cada viernes de forma dinámica según los pagos cobrados
+            t1_class = "completed" if paid_count >= 1 else "pending"
+            t2_class = "completed" if paid_count >= 2 else "pending"
+            t3_class = "completed" if paid_count >= 3 else "pending"
+            t4_class = "completed" if paid_count >= 4 else "pending"
+            
+            st.markdown(
+                f"""
+                <div class="financing-card-container">
+                    <div class="financing-card-header">
+                        <div>
+                            <span class="financing-card-driver">{row['DRIVER']}</span> 
+                            <span class="financing-card-meta"> | Truck: {row['TRUCK_ID']}</span>
+                        </div>
+                        <span class="financing-card-id">ID: {row['ID_FIN']}</span>
+                    </div>
+                    
+                    <div class="financing-grid">
+                        <div>
+                            <div class="financing-metric-label">Total Financed (Fixed)</div>
+                            <div class="financing-metric-value">${total_val:,.2f}</div>
+                            <div class="financing-metric-sub">4 installments of ${quota:,.2f}</div>
+                        </div>
+                        <div>
+                            <div class="financing-metric-label">Installments Collected</div>
+                            <div class="financing-metric-value">{paid_count} <span style="color: #94A3B8; font-size: 1rem; font-weight: 400;">/ 4</span></div>
+                            <div class="financing-metric-sub">Status: {"Complete" if paid_count == 4 else "Active"}</div>
+                        </div>
+                        <div>
+                            <div class="financing-metric-label">Remaining Balance</div>
+                            <div class="financing-metric-value highlighted">${current_debt:,.2f}</div>
+                            <div class="financing-metric-sub">Concept: {row['CONCEPT']}</div>
+                        </div>
+                    </div>
+                    
+                    <div class="financing-timeline">
+                        <div class="timeline-item {t1_class}"><b>Fri 1:</b> {row['FRIDAY_1']}</div>
+                        <div class="timeline-item {t2_class}"><b>Fri 2:</b> {row['FRIDAY_2']}</div>
+                        <div class="timeline-item {t3_class}"><b>Fri 3:</b> {row['FRIDAY_3']}</div>
+                        <div class="timeline-item last {t4_class}"><b>Fri 4:</b> {row['FRIDAY_4']}</div>
+                    </div>
+                </div>
+                """, 
+                unsafe_allow_html=True
+            )
+    else:
+        st.info("No active financing records found.")
+        # ==================================================
+# TAB 9: TRUCK PAYMENTS (MÓDULO DE FINANCIAMIENTO DE CAMIONES)
+# ==================================================
+with tabs[9]:
+    st.subheader("Truck Purchase & Financing Control")
+    st.caption("Track heavy truck acquisitions, weekly amortizations, and equity delivery records for owner-operators.")
+    
+    col_truck1, col_truck2 = st.columns(2)
+    
+    with col_truck1:
+        with st.form("form_truck_payments", clear_on_submit=True):
+            st.markdown("<h5 style='color:#1E293B; margin-bottom:15px;'>New Lease-to-Own / Financing Agreement</h5>", unsafe_allow_html=True)
+            t_driver = st.text_input("Driver Name").strip()
+            t_truck = st.text_input("Truck ID / VIN").strip()
+            t_total_value = st.number_input("Total Truck Value (USD)", min_value=0.0, step=1000.0, value=0.0)
+            t_weekly_amort = st.number_input("Weekly Amortization Rate (USD)", min_value=0.0, step=50.0, value=0.0)
+            t_date_start = st.date_input("Financing Start Date", datetime.today())
+
+            btn_save_truck = st.form_submit_button("Register Truck Financing")
+            
+            if btn_save_truck:
+                if not t_driver or t_total_value <= 0 or t_weekly_amort <= 0:
+                    st.error("Please fill out all fields with valid amounts.")
+                else:
+                    try:
+                        ws_truck = client.open(SHEET_NAME).worksheet("TRUCK_PAYMENTS")
+                        new_row = [
+                            t_driver,
+                            t_truck,
+                            t_total_value,
+                            t_weekly_amort,
+                            0,  # TOTAL_PAID inicia en 0
+                            t_date_start.strftime('%Y-%m-%d')
+                        ]
+                        ws_truck.append_row(new_row)
+                        st.success(f"Financing ledger initialized for Truck {t_truck} ({t_driver}).")
+                        st.cache_data.clear()
+                        st.rerun()
+                    except Exception as e:
+                        st.error(f"Database sync error: {e}")
+
+    with col_truck2:
+        if not truck_pay.empty:
+            with st.form("form_update_truck_pay", clear_on_submit=True):
+                st.markdown("<h5 style='color:#1E293B; margin-bottom:15px;'>Record Weekly Amortization Delivery</h5>", unsafe_allow_html=True)
+                
+                # Filtrar camiones que aún no se han pagado por completo
+                active_trucks = truck_pay[truck_pay["TOTAL_PAID"].astype(float) < truck_pay["TOTAL_VALUE"].astype(float)]
+                
+                if not active_trucks.empty:
+                    truck_options = active_trucks.apply(lambda r: f"{r['DRIVER']} - Truck: {r['TRUCK_ID']}", axis=1).tolist()
+                    selected_truck_opt = st.selectbox("Select Active Truck Ledger", truck_options)
+                    
+                    # Extraer conductor y camión para buscar la fila exacta
+                    sel_driver = selected_truck_opt.split(" - Truck: ")[0].strip()
+                    sel_truck = selected_truck_opt.split(" - Truck: ")[1].strip()
+                    
+                    st.caption("Applying this record will add the set weekly amortization amount to the driver's total equity.")
+                    btn_apply_truck_pay = st.form_submit_button("Confirm & Apply Weekly Amortization")
+                    
+                    if btn_apply_truck_pay:
+                        try:
+                            ws_truck = client.open(SHEET_NAME).worksheet("TRUCK_PAYMENTS")
+                            
+                            # Buscar la celda correcta haciendo match con el Camión o Conductor
+                            cell = ws_truck.find(sel_truck)
+                            row_idx = cell.row
+                            
+                            current_paid = float(ws_truck.cell(row_idx, 5).value or 0.0)
+                            weekly_rate = float(ws_truck.cell(row_idx, 4).value or 0.0)
+                            total_value = float(ws_truck.cell(row_idx, 3).value or 0.0)
+                            
+                            new_paid_total = min(current_paid + weekly_rate, total_value)
+                            
+                            ws_truck.update_cell(row_idx, 5, new_paid_total)
+                            st.success(f"Payment applied. Total paid updated to ${new_paid_total:,.2f} of ${total_value:,.2f}")
+                            st.cache_data.clear()
+                            st.rerun()
+                        except Exception as e:
+                            st.error(f"Error updating truck balance: {e}")
+                else:
+                    st.info("All registered trucks are fully paid and owned.")
+        else:
+            st.info("No truck financing records available yet.")
+
+    st.divider()
+    st.markdown("##### Truck Financing Equity Portfolios")
+    
+    if not truck_pay.empty:
+        for index, row in truck_pay.iterrows():
+            t_val = float(row["TOTAL_VALUE"])
+            t_paid = float(row["TOTAL_PAID"])
+            t_rate = float(row["WEEKLY_AMORTIZATION"])
+            t_rem = max(0.0, t_val - t_paid)
+            
+            progress_pct = min(1.0, t_paid / t_val) if t_val > 0 else 0.0
+            
+            # Formato de tarjeta premium idéntico al estilo corporativo inyectado
+            st.markdown(
+                f"""
+                <div class="financing-card-container">
+                    <div class="financing-card-header">
+                        <div>
+                            <span class="financing-card-driver">{row['DRIVER']}</span> 
+                            <span class="financing-card-meta"> | Purchase Agreement</span>
+                        </div>
+                        <span class="financing-card-id">Truck ID: {row['TRUCK_ID']}</span>
+                    </div>
+                    
+                    <div class="financing-grid">
+                        <div>
+                            <div class="financing-metric-label">Total Asset Value</div>
+                            <div class="financing-metric-value">${t_val:,.2f}</div>
+                            <div class="financing-metric-sub">Rate: ${t_rate:,.2f} / week</div>
+                        </div>
+                        <div>
+                            <div class="financing-metric-label">Equity Delivered (Paid)</div>
+                            <div class="financing-metric-value">{t_paid:,.2f}</div>
+                            <div class="financing-metric-sub">Progress: {progress_pct*100:.1f}%</div>
+                        </div>
+                        <div>
+                            <div class="financing-metric-label">Remaining Principal</div>
+                            <div class="financing-metric-value highlighted">${t_rem:,.2f}</div>
+                            <div class="financing-metric-sub">Start Date: {row['START_DATE']}</div>
+                        </div>
+                    </div>
+                </div>
+                """, 
+                unsafe_allow_html=True
+            )
+            # Barra de progreso nativa alineada con el look corporativo
+            st.progress(progress_pct)
+    else:
+        st.info("No active truck payments portfolios found.")
+
+
+# ==================================================
+# TAB 10: DISPATCH TRACKER (CONTROL DE IMPREVISTOS Y GASTOS OPERATIVOS)
+# ==================================================
+with tabs[10]:
+    st.subheader("Dispatch Expense & Tracker Audit")
+    st.caption("Independent ledger to register corporate overhead, dispatch operational fees, or emergency fuel cash advances.")
+    
+    col_disp1, col_disp2 = st.columns([1, 2])
+    
+    with col_disp1:
+        with st.form("form_dispatch_tracker", clear_on_submit=True):
+            st.markdown("<h5 style='color:#1E293B; margin-bottom:15px;'>Record Transaction</h5>", unsafe_allow_html=True)
+            d_date = st.date_input("Transaction Date", datetime.today())
+            d_concept = st.text_input("Concept (e.g., Office Rent, Tolls, Escrow Transfer)").strip()
+            d_amount = st.number_input("Amount (USD)", min_value=0.0, step=50.0, value=0.0)
+            d_type = st.selectbox("Transaction Type", ["OPERATIONAL_EXPENSE", "DISPATCH_FEE_INFLOW", "EMERGENCY_ADVANCE"])
+
+            btn_save_dispatch = st.form_submit_button("Post Transaction")
+            
+            if btn_save_dispatch:
+                if not d_concept or d_amount <= 0:
+                    st.error("Please provide a valid Concept and Amount.")
+                else:
+                    try:
+                        ws_disp = client.open(SHEET_NAME).worksheet("DISPATCH_TRACKER")
+                        new_row = [
+                            d_date.strftime('%Y-%m-%d'),
+                            d_date.strftime('%B'), # Guarda el mes automáticamente
+                            d_concept,
+                            d_amount,
+                            d_type
+                        ]
+                        ws_disp.append_row(new_row)
+                        st.success("Transaction recorded securely in the global operational ledger.")
+                        st.cache_data.clear()
+                        st.rerun()
+                    except Exception as e:
+                        st.error(f"Database ledger error: {e}")
+
+    with col_disp2:
+        st.markdown("<h5 style='color:#1E293B; margin-bottom:15px;'>Operational Balance Sheet</h5>", unsafe_allow_html=True)
+        
+        if not dispatch_track.empty:
+            dispatch_track["AMOUNT"] = dispatch_track["AMOUNT"].astype(float)
+            
+            # Cálculos rápidos de flujos
+            total_inflows = dispatch_track[dispatch_track["TYPE"] == "DISPATCH_FEE_INFLOW"]["AMOUNT"].sum()
+            total_outflows = dispatch_track[dispatch_track["TYPE"] == "OPERATIONAL_EXPENSE"]["AMOUNT"].sum()
+            total_advances = dispatch_track[dispatch_track["TYPE"] == "EMERGENCY_ADVANCE"]["AMOUNT"].sum()
+            net_cash_flow = total_inflows - total_outflows - total_advances
+            
+            # Métricas en formato limpio de tarjetas pequeñas
+            m1, m2, m3 = st.columns(3)
+            m1.metric("Inflows (Fees)", f"${total_inflows:,.2f}")
+            m2.metric("Outflows (Expenses)", f"${total_outflows:,.2f}")
+            m3.metric("Net Operational Flow", f"${net_cash_flow:,.2f}")
+            
+            st.divider()
+            
+            # Tabla interactiva con formato premium usando las bondades de Streamlit
+            st.markdown("###### Detailed Transactions Ledger")
+            st.dataframe(
+                dispatch_track.sort_values(by="DATE", ascending=False),
+                column_config={
+                    "DATE": st.column_config.DateColumn("Date Format"),
+                    "MONTH": "Audit Month",
+                    "CONCEPT": "Transaction Description",
+                    "AMOUNT": st.column_config.NumberColumn("Value (USD)", format="$%.2f"),
+                    "TYPE": "Ledger Category"
+                },
+                use_container_width=True,
+                hide_index=True
+            )
+        else:
+            st.info("No business transactions recorded for the current tracking cycle.")
