@@ -1215,6 +1215,7 @@ with tabs[8]:
             with st.form("form_update_installment", clear_on_submit=True):
                 st.markdown("<h5 style='color:#1E293B; margin-bottom:15px;'>Record Installment Collection</h5>", unsafe_allow_html=True)
                 
+                # Buscamos solo los acuerdos que tengan menos de 4 pagos realizados
                 active_agreements = expense_fin[expense_fin["INSTALLMENTS_PAID"].astype(int) < 4]
                 
                 if not active_agreements.empty:
@@ -1247,7 +1248,7 @@ with tabs[8]:
 
     st.divider()
 
-    # --- SECCIÓN VISUAL DE AUDITORÍA (CORREGIDA SIN ESPACIOS INTERNOS EXTRA) ---
+    # --- SECCIÓN VISUAL DE AUDITORÍA DINÁMICA ---
     st.markdown("##### Active Agreements Status")
     
     if not expense_fin.empty:
@@ -1262,17 +1263,19 @@ with tabs[8]:
             quota = total_val / 4
             current_debt = max(0.0, total_val - (paid_count * quota))
             
+            # Conversión segura de fechas para auditoría automatizada
             f1_dt = pd.to_datetime(row['FRIDAY_1'], errors='coerce')
             f2_dt = pd.to_datetime(row['FRIDAY_2'], errors='coerce')
             f3_dt = pd.to_datetime(row['FRIDAY_3'], errors='coerce')
             f4_dt = pd.to_datetime(row['FRIDAY_4'], errors='coerce')
             
+            # Lógica Dinámica Inteligente: Completado si ya se pagó la cuota correspondiente O si el calendario ya venció la fecha
             t1_class = "completed" if paid_count >= 1 or (not pd.isna(f1_dt) and f1_dt < current_time_today) else "pending"
             t2_class = "completed" if paid_count >= 2 or (not pd.isna(f2_dt) and f2_dt < current_time_today) else "pending"
             t3_class = "completed" if paid_count >= 3 or (not pd.isna(f3_dt) and f3_dt < current_time_today) else "pending"
             t4_class = "completed" if paid_count >= 4 or (not pd.isna(f4_dt) and f4_dt < current_time_today) else "pending"
             
-            # Nota: Mantener el string HTML pegado al borde izquierdo evita fallos de Markdown en Streamlit
+            # Nota estructural: El string HTML se mantiene alineado a la izquierda para evitar fallas de Markdown en Streamlit
             card_html = f"""
 <div class="financing-card-container">
     <div class="financing-card-header">
@@ -1312,7 +1315,7 @@ with tabs[8]:
 
 
 # ==================================================
-# TAB 9: TRUCK PAYMENTS
+# TAB 9: TRUCK PAYMENTS (FLEXIBLE VERSION)
 # ==================================================
 with tabs[9]:
     st.subheader("Truck Purchase & Financing Control")
@@ -1342,7 +1345,7 @@ with tabs[9]:
                             t_truck,
                             t_total_value,
                             t_weekly_amort,
-                            0,
+                            0,  # TOTAL_PAID inicia en 0
                             t_date_start.strftime('%Y-%m-%d')
                         ]
                         ws_truck.append_row(new_row)
@@ -1357,36 +1360,55 @@ with tabs[9]:
             with st.form("form_update_truck_pay", clear_on_submit=True):
                 st.markdown("<h5 style='color:#1E293B; margin-bottom:15px;'>Record Weekly Amortization Delivery</h5>", unsafe_allow_html=True)
                 
+                # Filtrar camiones con saldo pendiente
                 active_trucks = truck_pay[truck_pay["TOTAL_PAID"].astype(float) < truck_pay["TOTAL_VALUE"].astype(float)]
                 
                 if not active_trucks.empty:
                     truck_options = active_trucks.apply(lambda r: f"{r['DRIVER']} - Truck: {r['TRUCK_ID']}", axis=1).tolist()
                     selected_truck_opt = st.selectbox("Select Active Truck Ledger", truck_options)
                     
+                    # Descomponer la selección del componente
                     sel_driver = selected_truck_opt.split(" - Truck: ")[0].strip()
                     sel_truck = selected_truck_opt.split(" - Truck: ")[1].strip()
                     
-                    st.caption("Applying this record will add the set weekly amortization amount to the driver's total equity.")
-                    btn_apply_truck_pay = st.form_submit_button("Confirm & Apply Weekly Amortization")
+                    # Buscar la cuota preestablecida original en el DataFrame local
+                    matched_row = active_trucks[(active_trucks["DRIVER"] == sel_driver) & (active_trucks["TRUCK_ID"] == sel_truck)].iloc[0]
+                    default_weekly_rate = float(matched_row["WEEKLY_AMORTIZATION"] or 0.0)
+                    
+                    # --- COMPONENTE FLEXIBLE EDITABLE ---
+                    st.markdown("<p style='margin-bottom:2px; font-size:14px; color:#475569;'>Amount to Pay (USD)</p>", unsafe_allow_html=True)
+                    custom_payment = st.number_input(
+                        "Amount to Pay (USD)", 
+                        min_value=0.0, 
+                        step=50.0, 
+                        value=default_weekly_rate,
+                        label_visibility="collapsed"
+                    )
+                    
+                    st.caption("Applying this record will add the specified amount to the driver's total equity.")
+                    btn_apply_truck_pay = st.form_submit_button("Confirm & Apply Payment")
                     
                     if btn_apply_truck_pay:
-                        try:
-                            ws_truck = client.open(SHEET_NAME).worksheet("TRUCK_PAYMENTS")
-                            cell = ws_truck.find(sel_truck)
-                            row_idx = cell.row
-                            
-                            current_paid = float(ws_truck.cell(row_idx, 5).value or 0.0)
-                            weekly_rate = float(ws_truck.cell(row_idx, 4).value or 0.0)
-                            total_value = float(ws_truck.cell(row_idx, 3).value or 0.0)
-                            
-                            new_paid_total = min(current_paid + weekly_rate, total_value)
-                            
-                            ws_truck.update_cell(row_idx, 5, new_paid_total)
-                            st.success(f"Payment applied. Total paid updated to ${new_paid_total:,.2f} of ${total_value:,.2f}")
-                            st.cache_data.clear()
-                            st.rerun()
-                        except Exception as e:
-                            st.error(f"Error updating truck balance: {e}")
+                        if custom_payment <= 0:
+                            st.error("Please enter a valid payment amount greater than 0.")
+                        else:
+                            try:
+                                ws_truck = client.open(SHEET_NAME).worksheet("TRUCK_PAYMENTS")
+                                cell = ws_truck.find(sel_truck)
+                                row_idx = cell.row
+                                
+                                current_paid = float(ws_truck.cell(row_idx, 5).value or 0.0)
+                                total_value = float(ws_truck.cell(row_idx, 3).value or 0.0)
+                                
+                                # Sumar el abono personalizado cuidando de no exceder el valor total del activo
+                                new_paid_total = min(current_paid + custom_payment, total_value)
+                                
+                                ws_truck.update_cell(row_idx, 5, new_paid_total)
+                                st.success(f"Payment applied. Total paid updated to ${new_paid_total:,.2f} of ${total_value:,.2f}")
+                                st.cache_data.clear()
+                                st.rerun()
+                            except Exception as e:
+                                st.error(f"Error updating truck balance: {e}")
                 else:
                     st.info("All registered trucks are fully paid and owned.")
         else:
@@ -1417,7 +1439,7 @@ with tabs[9]:
         <div>
             <div class="financing-metric-label">Total Asset Value</div>
             <div class="financing-metric-value">${t_val:,.2f}</div>
-            <div class="financing-metric-sub">Rate: ${t_rate:,.2f} / week</div>
+            <div class="financing-metric-sub">Base Rate: ${t_rate:,.2f} / wk</div>
         </div>
         <div>
             <div class="financing-metric-label">Equity Delivered (Paid)</div>
@@ -1438,76 +1460,111 @@ with tabs[9]:
 
 
 # ==================================================
-# TAB 10: DISPATCH TRACKER (TABLAS CON ENCABEZADOS EN AZUL)
+# TAB 10: ACCOUNTS PAYABLE / PERSON OBLIGATIONS
 # ==================================================
 with tabs[10]:
-    st.subheader("Dispatch Expense & Tracker Audit")
-    st.caption("Independent ledger to register corporate overhead, dispatch operational fees, or emergency fuel cash advances.")
-    
-    col_disp1, col_disp2 = st.columns([1, 2])
-    
-    with col_disp1:
-        with st.form("form_dispatch_tracker", clear_on_submit=True):
-            st.markdown("<h5 style='color:#1E293B; margin-bottom:15px;'>Record Transaction</h5>", unsafe_allow_html=True)
-            d_date = st.date_input("Transaction Date", datetime.today())
-            d_concept = st.text_input("Concept (e.g., Office Rent, Tolls, Escrow Transfer)").strip()
-            d_amount = st.number_input("Amount (USD)", min_value=0.0, step=50.0, value=0.0)
-            d_type = st.selectbox("Transaction Type", ["OPERATIONAL_EXPENSE", "DISPATCH_FEE_INFLOW", "EMERGENCY_ADVANCE"])
+    import plotly.express as px
 
-            btn_save_dispatch = st.form_submit_button("Post Transaction")
+    st.subheader("External Accounts Payable Control")
+    st.caption("Manage business liabilities, tracking specific amounts owed to individuals or suppliers to eliminate double-payments.")
+    
+    col_p1, col_p2 = st.columns([1, 1])
+    
+    with col_p1:
+        with st.form("form_person_payments", clear_on_submit=True):
+            st.markdown("<h5 style='color:#1E293B; margin-bottom:15px;'>Record Obligation Payment / Update Debt</h5>", unsafe_allow_html=True)
             
-            if btn_save_dispatch:
-                if not d_concept or d_amount <= 0:
-                    st.error("Please provide a valid Concept and Amount.")
+            p_name = st.text_input("Creditor / Person Name (e.g., John Doe)").strip()
+            p_concept = st.text_input("Concept (e.g., Loan Settlement, Factoring Adjustment, Office Lease)").strip()
+            p_total_debt = st.number_input("Total Debt Value (USD)", min_value=0.0, step=100.0, value=0.0)
+            p_amount_paid = st.number_input("Amount Paid so far (USD)", min_value=0.0, step=50.0, value=0.0)
+            p_date = st.date_input("Transaction Log Date", datetime.today())
+
+            btn_save_person = st.form_submit_button("Post / Update Obligation")
+            
+            if btn_save_person:
+                if not p_name or not p_concept or p_total_debt <= 0:
+                    st.error("Please provide a valid Person Name, Concept, and Total Debt.")
+                elif p_amount_paid > p_total_debt:
+                    st.error("Amount paid cannot exceed the total agreed debt value.")
                 else:
                     try:
                         ws_disp = client.open(SHEET_NAME).worksheet("DISPATCH_TRACKER")
                         new_row = [
-                            d_date.strftime('%Y-%m-%d'),
-                            d_date.strftime('%B'), 
-                            d_concept,
-                            d_amount,
-                            d_type
+                            p_date.strftime('%Y-%m-%d'),
+                            p_name, 
+                            p_concept,
+                            p_total_debt,
+                            p_amount_paid
                         ]
                         ws_disp.append_row(new_row)
-                        st.success("Transaction recorded securely in the global operational ledger.")
+                        st.success(f"Ledger entry recorded for {p_name} successfully.")
                         st.cache_data.clear()
                         st.rerun()
                     except Exception as e:
-                        st.error(f"Database ledger error: {e}")
+                        st.error(f"Database ledger sync error: {e}")
 
-    with col_disp2:
-        st.markdown("<h5 style='color:#1E293B; margin-bottom:15px;'>Operational Balance Sheet</h5>", unsafe_allow_html=True)
+    with col_p2:
+        st.markdown("<h5 style='color:#1E293B; margin-bottom:15px;'>Visual Liability Analytics</h5>", unsafe_allow_html=True)
         
         if not dispatch_track.empty:
-            dispatch_track["AMOUNT"] = dispatch_track["AMOUNT"].astype(float)
+            try:
+                # Estructuramos localmente el DataFrame para reflejar los pasivos
+                df_debts = dispatch_track.copy()
+                df_debts.columns = ["DATE", "PERSON", "CONCEPT", "TOTAL_DEBT", "AMOUNT_PAID"]
+                
+                df_debts["TOTAL_DEBT"] = df_debts["TOTAL_DEBT"].astype(float)
+                df_debts["AMOUNT_PAID"] = df_debts["AMOUNT_PAID"].astype(float)
+                
+                # Totales consolidados para armar la gráfica circular
+                global_total_debt = df_debts["TOTAL_DEBT"].sum()
+                global_total_paid = df_debts["AMOUNT_PAID"].sum()
+                global_remaining = max(0.0, global_total_debt - global_total_paid)
+                
+                if global_total_debt > 0:
+                    # Estructura de datos para Plotly Pie
+                    pie_data = pd.DataFrame({
+                        "Status": ["Total Paid", "Remaining Debt"],
+                        "Amount": [global_total_paid, global_remaining]
+                    })
+                    
+                    fig = px.pie(
+                        pie_data, 
+                        values="Amount", 
+                        names="Status", 
+                        color="Status",
+                        color_discrete_map={"Total Paid": "#10B981", "Remaining Debt": "#EF4444"},
+                        hole=0.4
+                    )
+                    fig.update_layout(margin=dict(t=10, b=10, l=10, r=10), height=230, showlegend=True)
+                    st.plotly_chart(fig, use_container_width=True)
+                    
+                    st.markdown(f"**Total Portfolio Indebtedness:** ${global_total_debt:,.2f} USD")
+                else:
+                    st.info("No numerical balance available to generate the chart.")
+            except Exception as e:
+                st.info("Awaiting formatted rows to display graph analytics.")
+        else:
+            st.info("No business liabilities tracked for the current cycle.")
             
-            total_inflows = dispatch_track[dispatch_track["TYPE"] == "DISPATCH_FEE_INFLOW"]["AMOUNT"].sum()
-            total_outflows = dispatch_track[dispatch_track["TYPE"] == "OPERATIONAL_EXPENSE"]["AMOUNT"].sum()
-            total_advances = dispatch_track[dispatch_track["TYPE"] == "EMERGENCY_ADVANCE"]["AMOUNT"].sum()
-            net_cash_flow = total_inflows - total_outflows - total_advances
-            
-            m1, m2, m3 = st.columns(3)
-            m1.metric("Inflows (Fees)", f"${total_inflows:,.2f}")
-            m2.metric("Outflows (Expenses)", f"${total_outflows:,.2f}")
-            m3.metric("Net Operational Flow", f"${net_cash_flow:,.2f}")
-            
-            st.divider()
-            
-            st.markdown("###### Detailed Transactions Ledger")
-            
-            # --- CAMBIO IMPORTANTE: PASAR POR ST.TABLE SI LOS ENCABEZADOS NATIVOS SE COMPORTAN REBELDES ---
+    st.divider()
+    st.markdown("###### Detailed Obligations & Accounts Payable Ledger")
+    
+    if not dispatch_track.empty:
+        try:
             st.dataframe(
-                dispatch_track.sort_values(by="DATE", ascending=False),
+                df_debts.sort_values(by="DATE", ascending=False),
                 column_config={
-                    "DATE": st.column_config.DateColumn("Date Format"),
-                    "MONTH": "Audit Month",
-                    "CONCEPT": "Transaction Description",
-                    "AMOUNT": st.column_config.NumberColumn("Value (USD)", format="$%.2f"),
-                    "TYPE": "Ledger Category"
+                    "DATE": st.column_config.DateColumn("Date"),
+                    "PERSON": "Creditor / Person",
+                    "CONCEPT": "Reason / Concept",
+                    "TOTAL_DEBT": st.column_config.NumberColumn("Total Debt (USD)", format="$%.2f"),
+                    "AMOUNT_PAID": st.column_config.NumberColumn("Paid to Date (USD)", format="$%.2f")
                 },
                 use_container_width=True,
                 hide_index=True
             )
-        else:
-            st.info("No business transactions recorded for the current tracking cycle.")
+        except:
+            st.dataframe(dispatch_track, use_container_width=True)
+    else:
+        st.info("No historical entries recorded.")
