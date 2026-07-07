@@ -1,3 +1,5 @@
+#PARTE 1 
+
 import streamlit as st
 import pandas as pd
 import gspread
@@ -408,6 +410,9 @@ tabs = st.tabs([
     ":material/local_shipping: Truck Payments",
     ":material/pie_chart: Dispatch Tracker"
 ])
+
+#PARTE 2 
+
 # TAB 1: LOADS
 with tabs[0]:
     st.subheader("General Loads Registry")
@@ -687,6 +692,7 @@ with tabs[3]:
         display_deductions["QTY_GALLONS"] = pd.to_numeric(display_deductions["QTY_GALLONS"]).apply(lambda x: int(x) if x == int(x) else x)
     st.dataframe(display_deductions, use_container_width=True)
 
+#PARTE 3 
 # ==================================================
 # TAB 5: OPERATION MODULE (ENTRY & ADJUSTMENTS)
 # ==================================================
@@ -1153,6 +1159,7 @@ with tabs[7]:
             st.success("El sistema no detecta demoras ni servicios pendientes de liquidación para el día de hoy.")
     else:
         st.info("No se encontraron registros de operaciones activos para el análisis de estatus.")
+#PARTE 4 
 # ==================================================
 # TAB 8: EXPENSE FINANCING (CORREGIDO SIN ERRORES DE FORM)
 # ==================================================
