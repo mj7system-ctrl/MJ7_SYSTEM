@@ -458,11 +458,14 @@ with tabs[2]:
             mj7_col = get_col("SETTLEMENTS", "mj7_net")
             driver_col = get_col("SETTLEMENTS", "driver_id")
             
-            performance_matrix = settlements_filtered.groupby([driver_col, load_col]).agg({
-                gross_col: "sum",
-                owner_col: "sum",
-                mj7_col: "sum"
-            }).reset_index()
+            if not settlements_filtered.empty and driver_col in settlements_filtered.columns and load_col in settlements_filtered.columns:
+    performance_matrix = settlements_filtered.groupby([driver_col, load_col]).agg({
+        gross_col: "sum",
+        owner_col: "sum",
+        mj7_col: "sum"
+    }).reset_index()
+else:
+    performance_matrix = pd.DataFrame()
             
             st.dataframe(
                 performance_matrix.style.format({
