@@ -1166,17 +1166,17 @@ with tabs[7]:
     st.divider()
     
     if not loads.empty:
-        # ✅ DEFINIR COLUMNAS NECESARIAS
-        load_id_col = get_col("CARGAS", "load_id")
-        status_col = get_col("CARGAS", "status")
-        company_col = get_col("CARGAS", "company")
-        driver_col = get_col("CARGAS", "driver_id")
-        delivery_col = get_col("CARGAS", "delivery_date")
-        origin_col = get_col("CARGAS", "origin")
-        destination_col = get_col("CARGAS", "destination")
+        # ✅ Usar nombres de columna CORRECTOS
+        load_id_col_name = "LOAD"
+        status_col_name = "STATUS"
+        company_col_name = "COMPANY"
+        driver_col_name = "DRIVER_ID"
+        delivery_col_name = "DELIVERY_DATE"
+        origin_col_name = "ORIGIN"
+        destination_col_name = "DESTINATION"
         
         loads_alerts = loads.copy()
-        loads_alerts["DELIVERY_DATE_DT"] = pd.to_datetime(loads_alerts[delivery_col], errors='coerce').dt.date
+        loads_alerts["DELIVERY_DATE_DT"] = pd.to_datetime(loads_alerts[delivery_col_name], errors='coerce').dt.date
         
         criticas = []
         atencion = []
@@ -1184,8 +1184,12 @@ with tabs[7]:
         en_tiempo = []
         
         for _, row in loads_alerts.iterrows():
-            status = str(row[status_col]).strip().upper()
-            fecha_entrega = row["DELIVERY_DATE_DT"]
+            try:
+                status = str(row[status_col_name]).strip().upper()
+            except:
+                status = "UNKNOWN"
+            
+            fecha_entrega = row.get("DELIVERY_DATE_DT")
             
             if status == "CLOSED / SETTLED" or pd.isna(fecha_entrega):
                 continue
@@ -1214,17 +1218,23 @@ with tabs[7]:
         
         # Critical
         if criticas:
-            st.markdown("<h5 style='color: #0F172A; font-weight: 600; margin-bottom: 15px;'>Critical Loads</h5>", unsafe_allow_html=True)
+            st.markdown("<h5 style='color: #0F172A; font-weight: 600; margin-bottom: 15px;'>🔴 Critical Loads</h5>", unsafe_allow_html=True)
             for item, motivo in criticas:
+                load_id = item.get(load_id_col_name, 'N/A')
+                company = item.get(company_col_name, 'N/A')
+                driver = item.get(driver_col_name, 'N/A')
+                origin = item.get(origin_col_name, 'N/A')
+                destination = item.get(destination_col_name, 'N/A')
+                
                 st.markdown(f"""
                 <div style="background-color: #FFFFFF; border: 1px solid #E2E8F0; border-left: 5px solid #DC2626; border-radius: 8px; padding: 16px; margin-bottom: 12px;">
                     <div style="display: flex; justify-content: space-between; align-items: center;">
-                        <span style="font-weight: 600; color: #0F172A;">Load: {item[load_id_col]} | {item[company_col]}</span>
+                        <span style="font-weight: 600; color: #0F172A;">Load: {load_id} | {company}</span>
                         <span style="font-size: 12px; color: #DC2626; background-color: #FEF2F2; padding: 4px 8px; border-radius: 4px;">{motivo}</span>
                     </div>
                     <div style="font-size: 13px; color: #475569; margin-top: 10px; border-top: 1px solid #F1F5F9; padding-top: 10px; display: flex; gap: 15px;">
-                        <div><span style="color: #94A3B8; font-weight: 500;">Driver:</span> <span style="font-weight: 500;">{item[driver_col]}</span></div>
-                        <div><span style="color: #94A3B8; font-weight: 500;">Route:</span> <span style="font-weight: 500;">{item[origin_col]} → {item[destination_col]}</span></div>
+                        <div><span style="color: #94A3B8; font-weight: 500;">Driver:</span> <span style="font-weight: 500;">{driver}</span></div>
+                        <div><span style="color: #94A3B8; font-weight: 500;">Route:</span> <span style="font-weight: 500;">{origin} → {destination}</span></div>
                     </div>
                 </div>
                 """, unsafe_allow_html=True)
@@ -1232,13 +1242,23 @@ with tabs[7]:
         
         # Attention
         if atencion:
-            st.markdown("<h5 style='color: #0F172A; font-weight: 600; margin-bottom: 15px;'>Urgent Loads</h5>", unsafe_allow_html=True)
+            st.markdown("<h5 style='color: #0F172A; font-weight: 600; margin-bottom: 15px;'>🟠 Urgent Loads (Due Tomorrow)</h5>", unsafe_allow_html=True)
             for item, motivo in atencion:
+                load_id = item.get(load_id_col_name, 'N/A')
+                company = item.get(company_col_name, 'N/A')
+                driver = item.get(driver_col_name, 'N/A')
+                origin = item.get(origin_col_name, 'N/A')
+                destination = item.get(destination_col_name, 'N/A')
+                
                 st.markdown(f"""
                 <div style="background-color: #FFFFFF; border: 1px solid #E2E8F0; border-left: 5px solid #D97706; border-radius: 8px; padding: 16px; margin-bottom: 12px;">
                     <div style="display: flex; justify-content: space-between; align-items: center;">
-                        <span style="font-weight: 600; color: #0F172A;">Load: {item[load_id_col]} | {item[company_col]}</span>
+                        <span style="font-weight: 600; color: #0F172A;">Load: {load_id} | {company}</span>
                         <span style="font-size: 12px; color: #B45309; background-color: #FEF3C7; padding: 4px 8px; border-radius: 4px;">{motivo}</span>
+                    </div>
+                    <div style="font-size: 13px; color: #475569; margin-top: 10px; border-top: 1px solid #F1F5F9; padding-top: 10px; display: flex; gap: 15px;">
+                        <div><span style="color: #94A3B8; font-weight: 500;">Driver:</span> <span style="font-weight: 500;">{driver}</span></div>
+                        <div><span style="color: #94A3B8; font-weight: 500;">Route:</span> <span style="font-weight: 500;">{origin} → {destination}</span></div>
                     </div>
                 </div>
                 """, unsafe_allow_html=True)
@@ -1246,22 +1266,50 @@ with tabs[7]:
         
         # Pending settlement
         if entregadas:
-            st.markdown("<h5 style='color: #0F172A; font-weight: 600; margin-bottom: 15px;'>Pending Settlement</h5>", unsafe_allow_html=True)
+            st.markdown("<h5 style='color: #0F172A; font-weight: 600; margin-bottom: 15px;'>🔵 Pending Settlement</h5>", unsafe_allow_html=True)
             for item, motivo in entregadas:
+                load_id = item.get(load_id_col_name, 'N/A')
+                company = item.get(company_col_name, 'N/A')
+                driver = item.get(driver_col_name, 'N/A')
+                origin = item.get(origin_col_name, 'N/A')
+                destination = item.get(destination_col_name, 'N/A')
+                
                 st.markdown(f"""
                 <div style="background-color: #FFFFFF; border: 1px solid #E2E8F0; border-left: 5px solid #2563EB; border-radius: 8px; padding: 16px; margin-bottom: 12px;">
                     <div style="display: flex; justify-content: space-between; align-items: center;">
-                        <span style="font-weight: 600; color: #0F172A;">Load: {item[load_id_col]} | {item[company_col]}</span>
+                        <span style="font-weight: 600; color: #0F172A;">Load: {load_id} | {company}</span>
                         <span style="font-size: 12px; color: #1E40AF; background-color: #EFF6FF; padding: 4px 8px; border-radius: 4px;">{motivo}</span>
+                    </div>
+                    <div style="font-size: 13px; color: #475569; margin-top: 10px; border-top: 1px solid #F1F5F9; padding-top: 10px; display: flex; gap: 15px;">
+                        <div><span style="color: #94A3B8; font-weight: 500;">Driver:</span> <span style="font-weight: 500;">{driver}</span></div>
+                        <div><span style="color: #94A3B8; font-weight: 500;">Route:</span> <span style="font-weight: 500;">{origin} → {destination}</span></div>
                     </div>
                 </div>
                 """, unsafe_allow_html=True)
             st.write("")
         
-        if not criticas and not atencion and not entregadas:
-            st.success("✅ No delays or pending settlements detected.")
+        # On Schedule
+        if en_tiempo:
+            st.markdown("<h5 style='color: #0F172A; font-weight: 600; margin-bottom: 15px;'>🟢 On Schedule</h5>", unsafe_allow_html=True)
+            for item, motivo in en_tiempo:
+                load_id = item.get(load_id_col_name, 'N/A')
+                company = item.get(company_col_name, 'N/A')
+                
+                st.markdown(f"""
+                <div style="background-color: #FFFFFF; border: 1px solid #E2E8F0; border-left: 5px solid #16A34A; border-radius: 8px; padding: 16px; margin-bottom: 12px;">
+                    <div style="display: flex; justify-content: space-between; align-items: center;">
+                        <span style="font-weight: 600; color: #0F172A;">Load: {load_id} | {company}</span>
+                        <span style="font-size: 12px; color: #15803D; background-color: #DCFCE7; padding: 4px 8px; border-radius: 4px;">{motivo}</span>
+                    </div>
+                </div>
+                """, unsafe_allow_html=True)
+            st.write("")
+        
+        if not criticas and not atencion and not entregadas and not en_tiempo:
+            st.success("✅ No active loads or all are settled.")
     else:
         st.info("ℹ️ No active load records.")
+
 
 # ====================================
 # TAB 8: EXPENSE FINANCING
