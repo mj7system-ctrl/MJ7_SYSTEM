@@ -1,96 +1,70 @@
-# utils/helpers.py
 """
-FUNCIONES AUXILIARES REUTILIZABLES
-Conversiones seguras, formateo, validación
+Utility helper functions.
 """
 
 import pandas as pd
-from typing import Any, Union
+import re
 from datetime import datetime
 
-
-# =================== CONVERSIONES SEGURAS ===================
-
-def safe_float(value: Any, default: float = 0.0) -> float:
-    """Convertir a FLOAT de forma segura."""
+def safe_float(value, default=0.0):
+    """Convert value to float safely."""
     try:
-        return float(value) if value is not None else default
-    except (TypeError, ValueError):
+        if pd.isna(value):
+            return default
+        return float(value)
+    except (ValueError, TypeError):
         return default
 
-
-def safe_int(value: Any, default: int = 0) -> int:
-    """Convertir a INT de forma segura."""
+def safe_int(value, default=0):
+    """Convert value to int safely."""
     try:
-        result = float(value) if value is not None else default
-        return int(result) if result == int(result) else int(result)
-    except (TypeError, ValueError):
+        if pd.isna(value):
+            return default
+        return int(value)
+    except (ValueError, TypeError):
         return default
 
+def safe_to_numeric(series, errors='coerce'):
+    """Convert series to numeric safely."""
+    return pd.to_numeric(series, errors=errors)
 
-# =================== FORMATEO ===================
-
-def money(value: Union[float, int], decimals: int = 2) -> str:
-    """Formatear como MONEDA USD con separadores de miles."""
-    amount = safe_float(value)
-    return f"${amount:,.{decimals}f}"
-
-
-def format_gallons(value: Any) -> Union[int, float]:
-    """Formatear galones: INT si es entero, FLOAT si decimal."""
-    num = safe_float(value)
-    return int(num) if num == int(num) else num
-
-
-def safe_date_str(value: Any, fmt: str = '%Y-%m-%d') -> str:
-    """Convertir a STRING de fecha de forma segura."""
+def money(value):
+    """Format value as USD currency."""
     try:
+        value = safe_float(value)
+        return f"${value:,.2f}"
+    except Exception:
+        return "$0.00"
+
+def format_gallons(value):
+    """Format value as gallons."""
+    try:
+        value = safe_float(value)
+        return f"{value:,.2f} gal"
+    except Exception:
+        return "0.00 gal"
+
+def safe_date_str(value):
+    """Convert date to string safely."""
+    try:
+        if pd.isna(value):
+            return ""
         if isinstance(value, str):
-            dt = pd.to_datetime(value)
-        else:
-            dt = value
-        return dt.strftime(fmt)
+            return value
+        return pd.to_datetime(value).strftime('%Y-%m-%d')
     except Exception:
         return ""
 
-
-# =================== PARSING ===================
-
-def parse_date(value: Any) -> Union[pd.Timestamp, None]:
-    """Parsear fecha de forma segura."""
+def parse_date(date_str):
+    """Parse date string to datetime."""
     try:
-        dt = pd.to_datetime(value, errors='coerce')
-        return dt if pd.notnull(dt) else None
+        return pd.to_datetime(date_str)
     except Exception:
         return None
 
-
-def safe_to_numeric(series: pd.Series, errors: str = 'coerce') -> pd.Series:
-    """Convertir SERIE a numérica de forma segura."""
-    return pd.to_numeric(series, errors=errors)
-
-
-def sorted_unique_safe(series: pd.Series) -> list:
-    """Retornar valores ÚNICOS y ORDENADOS, manejando tipos mixtos."""
+def sorted_unique_safe(series):
+    """Get sorted unique values from series safely."""
     try:
-        unique_vals = series.dropna().unique()
-        str_vals = [str(v) for v in unique_vals]
-        return sorted(str_vals)
+        return sorted(series.dropna().unique())
     except Exception:
         return []
-
-
-# =================== VALIDACIÓN ===================
-
-def validate_dataframe(df, sheet_name: str) -> tuple:
-    """Validar que DataFrame tiene estructura correcta."""
-    from config.columns import validate_sheet_columns
-    
-    errors = []
-    missing = validate_sheet_columns(df, sheet_name)
-    if missing:
-        errors.append(f"Faltan columnas en {sheet_name}: {', '.join(missing)}")
-    if df.empty:
-        errors.append(f"{sheet_name} está vacío")
-    
-    return len(errors) == 0, errors
