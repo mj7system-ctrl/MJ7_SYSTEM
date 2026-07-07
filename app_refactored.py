@@ -1166,7 +1166,15 @@ with tabs[7]:
     st.divider()
     
     if not loads.empty:
+        # ✅ DEFINIR COLUMNAS NECESARIAS
+        load_id_col = get_col("CARGAS", "load_id")
+        status_col = get_col("CARGAS", "status")
+        company_col = get_col("CARGAS", "company")
+        driver_col = get_col("CARGAS", "driver_id")
         delivery_col = get_col("CARGAS", "delivery_date")
+        origin_col = get_col("CARGAS", "origin")
+        destination_col = get_col("CARGAS", "destination")
+        
         loads_alerts = loads.copy()
         loads_alerts["DELIVERY_DATE_DT"] = pd.to_datetime(loads_alerts[delivery_col], errors='coerce').dt.date
         
@@ -1216,7 +1224,7 @@ with tabs[7]:
                     </div>
                     <div style="font-size: 13px; color: #475569; margin-top: 10px; border-top: 1px solid #F1F5F9; padding-top: 10px; display: flex; gap: 15px;">
                         <div><span style="color: #94A3B8; font-weight: 500;">Driver:</span> <span style="font-weight: 500;">{item[driver_col]}</span></div>
-                        <div><span style="color: #94A3B8; font-weight: 500;">Route:</span> <span style="font-weight: 500;">{item[get_col("CARGAS", "origin")]} → {item[get_col("CARGAS", "destination")]}</span></div>
+                        <div><span style="color: #94A3B8; font-weight: 500;">Route:</span> <span style="font-weight: 500;">{item[origin_col]} → {item[destination_col]}</span></div>
                     </div>
                 </div>
                 """, unsafe_allow_html=True)
