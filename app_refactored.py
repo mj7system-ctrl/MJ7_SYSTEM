@@ -422,7 +422,6 @@ with tabs[0]:
 with tabs[1]:
     st.subheader("Closed Settlements History")
     st.dataframe(settlements, use_container_width=True)
-
 # ====================================
 # TAB 2: PERFORMANCE & CARD GENERATOR
 # ====================================
@@ -459,241 +458,243 @@ with tabs[2]:
             driver_col = get_col("SETTLEMENTS", "driver_id")
             
             if not settlements_filtered.empty and driver_col in settlements_filtered.columns and load_col in settlements_filtered.columns:
-    performance_matrix = settlements_filtered.groupby([driver_col, load_col]).agg({
-        gross_col: "sum",
-        owner_col: "sum",
-        mj7_col: "sum"
-    }).reset_index()
-    
-    st.dataframe(
-        performance_matrix.style.format({
-            gross_col: "${:,.2f}",
-            owner_col: "${:,.2f}",
-            mj7_col: "${:,.2f}"
-        }),
-        use_container_width=True
-    )
-else:
-    st.info("ℹ️ No data available for this selection.")
-            st.markdown("---")
-            st.subheader("Generate Performance Cards")
-            target_perf_drivers = st.multiselect(
-                "Select drivers to generate cards:",
-                performance_matrix[driver_col].unique()
-            )
-            
-            if target_perf_drivers:
-                try:
-                    with open("logo.jpeg", "rb") as image_file:
-                        encoded_logo = base64.b64encode(image_file.read()).decode()
-                    logo_html_tag = f'<img src="data:image/jpeg;base64,{encoded_logo}" style="height: 36px; border-radius: 4px; border: 1px solid #E2E8F0;">'
-                except Exception:
-                    logo_html_tag = ''
+                performance_matrix = settlements_filtered.groupby([driver_col, load_col]).agg({
+                    gross_col: "sum",
+                    owner_col: "sum",
+                    mj7_col: "sum"
+                }).reset_index()
                 
-                def generate_reportlab_pdf(title_suffix, driver_id, name_str, date_str, gross, owner_pay, mj7_net):
-                    """Generar PDF con ReportLab."""
-                    pdf_buffer = io.BytesIO()
-                    doc = SimpleDocTemplate(
-                        pdf_buffer,
-                        pagesize=(600, 260),
-                        rightMargin=20, leftMargin=20, topMargin=20, bottomMargin=20
-                    )
-                    
-                    styles = getSampleStyleSheet()
-                    title_style = ParagraphStyle(
-                        'CardTitle', fontName='Helvetica-Bold', fontSize=14, leading=16,
-                        textColor=colors.HexColor("#1E293B")
-                    )
-                    info_style = ParagraphStyle(
-                        'DriverInfo', fontName='Helvetica-Bold', fontSize=11, leading=14,
-                        textColor=colors.HexColor("#334155")
-                    )
-                    label_style = ParagraphStyle(
-                        'MetricLabel', fontName='Helvetica-Bold', fontSize=9, leading=11,
-                        textColor=colors.HexColor("#64748B")
-                    )
-                    value_style = ParagraphStyle(
-                        'MetricValue', fontName='Helvetica-Bold', fontSize=18, leading=22,
-                        textColor=colors.HexColor("#1E293B")
-                    )
-                    net_label_style = ParagraphStyle(
-                        'NetLabel', fontName='Helvetica-Bold', fontSize=9, leading=11,
-                        textColor=colors.HexColor("#1E40AF")
-                    )
-                    net_value_style = ParagraphStyle(
-                        'NetValue', fontName='Helvetica-Bold', fontSize=18, leading=22,
-                        textColor=colors.HexColor("#1D4ED8")
-                    )
-                    
-                    story = []
-                    
-                    # Header
-                    header_text = f"<b>MJ7 LOGISTICS CENTER — {title_suffix}</b><br/><font color='#64748B'>Date: {date_str}</font>"
-                    header_p = Paragraph(header_text, title_style)
-                    header_data = [[header_p, ""]]
-                    
-                    if os.path.exists("logo.jpeg"):
-                        try:
-                            logo_img = RLImage("logo.jpeg", width=70, height=35)
-                            header_data = [[header_p, logo_img]]
-                        except:
-                            pass
-                    
-                    header_table = Table(header_data, colWidths=[470, 90])
-                    header_table.setStyle(TableStyle([
-                        ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
-                        ('ALIGN', (1, 0), (1, 0), 'RIGHT'),
-                        ('LINEBELOW', (0, 0), (-1, -1), 1, colors.HexColor("#E2E8F0")),
-                        ('BOTTOMPADDING', (0, 0), (-1, -1), 12),
-                    ]))
-                    story.append(header_table)
-                    story.append(Spacer(1, 12))
-                    
-                    # Driver info
-                    info_p = Paragraph(f"DRIVER ID: {driver_id} &nbsp;&nbsp;|&nbsp;&nbsp; NAME: {name_str}", info_style)
-                    info_table = Table([[info_p]], colWidths=[560])
-                    info_table.setStyle(TableStyle([
-                        ('BACKGROUND', (0, 0), (-1, -1), colors.HexColor("#F8FAFC")),
-                        ('PADDING', (0, 0), (-1, -1), 8),
-                        ('BOTTOMPADDING', (0, 0), (-1, -1), 10),
-                    ]))
-                    story.append(info_table)
-                    story.append(Spacer(1, 15))
-                    
-                    # Metrics
-                    box_gross = [
-                        Paragraph("TOTAL GROSS", label_style),
-                        Spacer(1, 8),
-                        Paragraph(f"${gross:,.2f}", value_style)
-                    ]
-                    box_owner = [
-                        Paragraph("OWNER PAY", label_style),
-                        Spacer(1, 8),
-                        Paragraph(f"${owner_pay:,.2f}", value_style)
-                    ]
-                    box_net = [
-                        Paragraph("MJ7 NET PROFIT", net_label_style),
-                        Spacer(1, 8),
-                        Paragraph(f"${mj7_net:,.2f}", net_value_style)
-                    ]
-                    
-                    metrics_table = Table([[box_gross, box_owner, box_net]], colWidths=[180, 180, 200])
-                    metrics_table.setStyle(TableStyle([
-                        ('BACKGROUND', (0, 0), (0, 0), colors.HexColor("#F8FAFC")),
-                        ('BACKGROUND', (1, 0), (1, 0), colors.HexColor("#F8FAFC")),
-                        ('BACKGROUND', (2, 0), (2, 0), colors.HexColor("#EFF6FF")),
-                        ('BOX', (0, 0), (0, 0), 1, colors.HexColor("#E2E8F0")),
-                        ('BOX', (1, 0), (1, 0), 1, colors.HexColor("#E2E8F0")),
-                        ('BOX', (2, 0), (2, 0), 1, colors.HexColor("#BFDBFE")),
-                        ('PADDING', (0, 0), (-1, -1), 12),
-                        ('VALIGN', (0, 0), (-1, -1), 'TOP'),
-                    ]))
-                    story.append(metrics_table)
-                    
-                    doc.build(story)
-                    return pdf_buffer.getvalue()
+                st.dataframe(
+                    performance_matrix.style.format({
+                        gross_col: "${:,.2f}",
+                        owner_col: "${:,.2f}",
+                        mj7_col: "${:,.2f}"
+                    }),
+                    use_container_width=True
+                )
                 
-                # Renderizar tarjetas
-                for d_id in target_perf_drivers:
-                    driver_loads = performance_matrix[performance_matrix[driver_col] == d_id]
-                    
+                st.markdown("---")
+                st.subheader("Generate Performance Cards")
+                target_perf_drivers = st.multiselect(
+                    "Select drivers to generate cards:",
+                    performance_matrix[driver_col].unique()
+                )
+                
+                if target_perf_drivers:
                     try:
-                        d_name = drivers[drivers[get_col("DRIVERS", "driver_id")].astype(str) == str(d_id)][
-                            get_col("DRIVERS", "full_name")
-                        ].iloc[0]
+                        with open("logo.jpeg", "rb") as image_file:
+                            encoded_logo = base64.b64encode(image_file.read()).decode()
+                        logo_html_tag = f'<img src="data:image/jpeg;base64,{encoded_logo}" style="height: 36px; border-radius: 4px; border: 1px solid #E2E8F0;">'
                     except Exception:
-                        d_name = "Unknown Driver"
+                        logo_html_tag = ''
                     
-                    st.write(f"### Performance Report: {d_name} ({d_id})")
+                    def generate_reportlab_pdf(title_suffix, driver_id, name_str, date_str, gross, owner_pay, mj7_net):
+                        """Generar PDF con ReportLab."""
+                        pdf_buffer = io.BytesIO()
+                        doc = SimpleDocTemplate(
+                            pdf_buffer,
+                            pagesize=(600, 260),
+                            rightMargin=20, leftMargin=20, topMargin=20, bottomMargin=20
+                        )
+                        
+                        styles = getSampleStyleSheet()
+                        title_style = ParagraphStyle(
+                            'CardTitle', fontName='Helvetica-Bold', fontSize=14, leading=16,
+                            textColor=colors.HexColor("#1E293B")
+                        )
+                        info_style = ParagraphStyle(
+                            'DriverInfo', fontName='Helvetica-Bold', fontSize=11, leading=14,
+                            textColor=colors.HexColor("#334155")
+                        )
+                        label_style = ParagraphStyle(
+                            'MetricLabel', fontName='Helvetica-Bold', fontSize=9, leading=11,
+                            textColor=colors.HexColor("#64748B")
+                        )
+                        value_style = ParagraphStyle(
+                            'MetricValue', fontName='Helvetica-Bold', fontSize=18, leading=22,
+                            textColor=colors.HexColor("#1E293B")
+                        )
+                        net_label_style = ParagraphStyle(
+                            'NetLabel', fontName='Helvetica-Bold', fontSize=9, leading=11,
+                            textColor=colors.HexColor("#1E40AF")
+                        )
+                        net_value_style = ParagraphStyle(
+                            'NetValue', fontName='Helvetica-Bold', fontSize=18, leading=22,
+                            textColor=colors.HexColor("#1D4ED8")
+                        )
+                        
+                        story = []
+                        
+                        # Header
+                        header_text = f"<b>MJ7 LOGISTICS CENTER — {title_suffix}</b><br/><font color='#64748B'>Date: {date_str}</font>"
+                        header_p = Paragraph(header_text, title_style)
+                        header_data = [[header_p, ""]]
+                        
+                        if os.path.exists("logo.jpeg"):
+                            try:
+                                logo_img = RLImage("logo.jpeg", width=70, height=35)
+                                header_data = [[header_p, logo_img]]
+                            except:
+                                pass
+                        
+                        header_table = Table(header_data, colWidths=[470, 90])
+                        header_table.setStyle(TableStyle([
+                            ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+                            ('ALIGN', (1, 0), (1, 0), 'RIGHT'),
+                            ('LINEBELOW', (0, 0), (-1, -1), 1, colors.HexColor("#E2E8F0")),
+                            ('BOTTOMPADDING', (0, 0), (-1, -1), 12),
+                        ]))
+                        story.append(header_table)
+                        story.append(Spacer(1, 12))
+                        
+                        # Driver info
+                        info_p = Paragraph(f"DRIVER ID: {driver_id} &nbsp;&nbsp;|&nbsp;&nbsp; NAME: {name_str}", info_style)
+                        info_table = Table([[info_p]], colWidths=[560])
+                        info_table.setStyle(TableStyle([
+                            ('BACKGROUND', (0, 0), (-1, -1), colors.HexColor("#F8FAFC")),
+                            ('PADDING', (0, 0), (-1, -1), 8),
+                            ('BOTTOMPADDING', (0, 0), (-1, -1), 10),
+                        ]))
+                        story.append(info_table)
+                        story.append(Spacer(1, 15))
+                        
+                        # Metrics
+                        box_gross = [
+                            Paragraph("TOTAL GROSS", label_style),
+                            Spacer(1, 8),
+                            Paragraph(f"${gross:,.2f}", value_style)
+                        ]
+                        box_owner = [
+                            Paragraph("OWNER PAY", label_style),
+                            Spacer(1, 8),
+                            Paragraph(f"${owner_pay:,.2f}", value_style)
+                        ]
+                        box_net = [
+                            Paragraph("MJ7 NET PROFIT", net_label_style),
+                            Spacer(1, 8),
+                            Paragraph(f"${mj7_net:,.2f}", net_value_style)
+                        ]
+                        
+                        metrics_table = Table([[box_gross, box_owner, box_net]], colWidths=[180, 180, 200])
+                        metrics_table.setStyle(TableStyle([
+                            ('BACKGROUND', (0, 0), (0, 0), colors.HexColor("#F8FAFC")),
+                            ('BACKGROUND', (1, 0), (1, 0), colors.HexColor("#F8FAFC")),
+                            ('BACKGROUND', (2, 0), (2, 0), colors.HexColor("#EFF6FF")),
+                            ('BOX', (0, 0), (0, 0), 1, colors.HexColor("#E2E8F0")),
+                            ('BOX', (1, 0), (1, 0), 1, colors.HexColor("#E2E8F0")),
+                            ('BOX', (2, 0), (2, 0), 1, colors.HexColor("#BFDBFE")),
+                            ('PADDING', (0, 0), (-1, -1), 12),
+                            ('VALIGN', (0, 0), (-1, -1), 'TOP'),
+                        ]))
+                        story.append(metrics_table)
+                        
+                        doc.build(story)
+                        return pdf_buffer.getvalue()
                     
-                    # Tarjetas individuales
-                    for _, load_row in driver_loads.iterrows():
-                        current_load_id = load_row[load_col]
-                        card_date_str = selected_date.strftime('%Y-%m-%d') if filter_type == "Specific Day" else datetime.now().strftime('%Y-%m-%d')
+                    # Renderizar tarjetas
+                    for d_id in target_perf_drivers:
+                        driver_loads = performance_matrix[performance_matrix[driver_col] == d_id]
                         
-                        card_html = render_load_card(
-                            load_id=current_load_id,
-                            driver_id=d_id,
-                            driver_name=d_name,
-                            date_str=card_date_str,
-                            gross=safe_float(load_row[gross_col]),
-                            owner_pay=safe_float(load_row[owner_col]),
-                            mj7_net=safe_float(load_row[mj7_col]),
-                            logo_html=logo_html_tag
-                        )
-                        st.markdown(card_html, unsafe_allow_html=True)
+                        try:
+                            d_name = drivers[drivers[get_col("DRIVERS", "driver_id")].astype(str) == str(d_id)][
+                                get_col("DRIVERS", "full_name")
+                            ].iloc[0]
+                        except Exception:
+                            d_name = "Unknown Driver"
                         
-                        pdf_data = generate_reportlab_pdf(
-                            f"LOAD {current_load_id}", d_id, d_name, card_date_str,
-                            safe_float(load_row[gross_col]),
-                            safe_float(load_row[owner_col]),
-                            safe_float(load_row[mj7_col])
-                        )
-                        st.download_button(
-                            label=f"Export Load Card {current_load_id} (PDF)",
-                            data=pdf_data,
-                            file_name=f"MJ7_Load_{current_load_id}_{d_id}.pdf",
-                            mime="application/pdf",
-                            key=f"btn_pdf_{d_id}_{current_load_id}"
-                        )
-                    
-                    # Resumen
-                    if len(driver_loads) > 1:
-                        total_gross = driver_loads[gross_col].sum()
-                        total_owner = driver_loads[owner_col].sum()
-                        total_net = driver_loads[mj7_col].sum()
+                        st.write(f"### Performance Report: {d_name} ({d_id})")
                         
-                        title_summary = "DAILY TOTALS" if filter_type == "Specific Day" else "ACCUMULATED TOTALS"
-                        subtitle_summary = f"Summary of {len(driver_loads)} loads for {card_date_str}" if filter_type == "Specific Day" else f"Summary of {len(driver_loads)} loads"
+                        # Tarjetas individuales
+                        for _, load_row in driver_loads.iterrows():
+                            current_load_id = load_row[load_col]
+                            card_date_str = selected_date.strftime('%Y-%m-%d') if filter_type == "Specific Day" else datetime.now().strftime('%Y-%m-%d')
+                            
+                            card_html = render_load_card(
+                                load_id=current_load_id,
+                                driver_id=d_id,
+                                driver_name=d_name,
+                                date_str=card_date_str,
+                                gross=safe_float(load_row[gross_col]),
+                                owner_pay=safe_float(load_row[owner_col]),
+                                mj7_net=safe_float(load_row[mj7_col]),
+                                logo_html=logo_html_tag
+                            )
+                            st.markdown(card_html, unsafe_allow_html=True)
+                            
+                            pdf_data = generate_reportlab_pdf(
+                                f"LOAD {current_load_id}", d_id, d_name, card_date_str,
+                                safe_float(load_row[gross_col]),
+                                safe_float(load_row[owner_col]),
+                                safe_float(load_row[mj7_col])
+                            )
+                            st.download_button(
+                                label=f"Export Load Card {current_load_id} (PDF)",
+                                data=pdf_data,
+                                file_name=f"MJ7_Load_{current_load_id}_{d_id}.pdf",
+                                mime="application/pdf",
+                                key=f"btn_pdf_{d_id}_{current_load_id}"
+                            )
                         
-                        summary_html = f"""
-                        <div style="background-color: #F1F5F9; border: 2px dashed #CBD5E1; border-radius: 12px; padding: 24px; margin-top: 15px; margin-bottom: 8px;">
-                            <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #CBD5E1; padding-bottom: 16px; margin-bottom: 16px;">
-                                <div>
-                                    <h4 style="margin: 0; color: #0F172A; font-size: 14px; letter-spacing: 0.5px; font-weight: 800;">MJ7 LOGISTICS — {title_summary}</h4>
-                                    <span style="font-size: 12px; color: #475569;">{subtitle_summary}</span>
+                        # Resumen
+                        if len(driver_loads) > 1:
+                            total_gross = driver_loads[gross_col].sum()
+                            total_owner = driver_loads[owner_col].sum()
+                            total_net = driver_loads[mj7_col].sum()
+                            
+                            title_summary = "DAILY TOTALS" if filter_type == "Specific Day" else "ACCUMULATED TOTALS"
+                            subtitle_summary = f"Summary of {len(driver_loads)} loads for {card_date_str}" if filter_type == "Specific Day" else f"Summary of {len(driver_loads)} loads"
+                            
+                            summary_html = f"""
+                            <div style="background-color: #F1F5F9; border: 2px dashed #CBD5E1; border-radius: 12px; padding: 24px; margin-top: 15px; margin-bottom: 8px;">
+                                <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #CBD5E1; padding-bottom: 16px; margin-bottom: 16px;">
+                                    <div>
+                                        <h4 style="margin: 0; color: #0F172A; font-size: 14px; letter-spacing: 0.5px; font-weight: 800;">MJ7 LOGISTICS — {title_summary}</h4>
+                                        <span style="font-size: 12px; color: #475569;">{subtitle_summary}</span>
+                                    </div>
+                                    {logo_html_tag}
                                 </div>
-                                {logo_html_tag}
+                                <div style="background-color: #FFFFFF; border: 1px solid #CBD5E1; border-radius: 6px; padding: 10px 14px; font-size: 13px; color: #334155; margin-bottom: 20px;">
+                                    <span style="color: #64748B; font-weight: 600;">DRIVER ID:</span> <span style="font-weight: 700; color: #0F172A;">{d_id}</span> | 
+                                    <span style="color: #64748B; font-weight: 600;">NAME:</span> <span style="font-weight: 700; color: #0F172A;">{d_name}</span>
+                                </div>
+                                <table style="width: 100%; border-collapse: separate; border-spacing: 16px 0; margin-left: -16px; margin-right: -16px;">
+                                    <tr>
+                                        <td style="width: 33.33%; background-color: #FFFFFF; border: 1px solid #CBD5E1; border-radius: 8px; padding: 14px; text-align: center;">
+                                            <div style="font-size: 11px; text-transform: uppercase; color: #475569; font-weight: 700;">Gross Total</div>
+                                            <div style="font-size: 22px; color: #0F172A; font-weight: 800;">{money(total_gross)}</div>
+                                        </td>
+                                        <td style="width: 33.33%; background-color: #FFFFFF; border: 1px solid #CBD5E1; border-radius: 8px; padding: 14px; text-align: center;">
+                                            <div style="font-size: 11px; text-transform: uppercase; color: #475569; font-weight: 700;">Total Owner Pay</div>
+                                            <div style="font-size: 22px; color: #0F172A; font-weight: 800;">{money(total_owner)}</div>
+                                        </td>
+                                        <td style="width: 33.33%; background-color: #2563EB; border: 1px solid #1D4ED8; border-radius: 8px; padding: 14px; text-align: center;">
+                                            <div style="font-size: 11px; text-transform: uppercase; color: #FFFFFF; font-weight: 700;">Total Net Profit</div>
+                                            <div style="font-size: 22px; color: #FFFFFF; font-weight: 800;">{money(total_net)}</div>
+                                        </td>
+                                    </tr>
+                                </table>
                             </div>
-                            <div style="background-color: #FFFFFF; border: 1px solid #CBD5E1; border-radius: 6px; padding: 10px 14px; font-size: 13px; color: #334155; margin-bottom: 20px;">
-                                <span style="color: #64748B; font-weight: 600;">DRIVER ID:</span> <span style="font-weight: 700; color: #0F172A;">{d_id}</span> | 
-                                <span style="color: #64748B; font-weight: 600;">NAME:</span> <span style="font-weight: 700; color: #0F172A;">{d_name}</span>
-                            </div>
-                            <table style="width: 100%; border-collapse: separate; border-spacing: 16px 0; margin-left: -16px; margin-right: -16px;">
-                                <tr>
-                                    <td style="width: 33.33%; background-color: #FFFFFF; border: 1px solid #CBD5E1; border-radius: 8px; padding: 14px; text-align: center;">
-                                        <div style="font-size: 11px; text-transform: uppercase; color: #475569; font-weight: 700;">Gross Total</div>
-                                        <div style="font-size: 22px; color: #0F172A; font-weight: 800;">{money(total_gross)}</div>
-                                    </td>
-                                    <td style="width: 33.33%; background-color: #FFFFFF; border: 1px solid #CBD5E1; border-radius: 8px; padding: 14px; text-align: center;">
-                                        <div style="font-size: 11px; text-transform: uppercase; color: #475569; font-weight: 700;">Total Owner Pay</div>
-                                        <div style="font-size: 22px; color: #0F172A; font-weight: 800;">{money(total_owner)}</div>
-                                    </td>
-                                    <td style="width: 33.33%; background-color: #2563EB; border: 1px solid #1D4ED8; border-radius: 8px; padding: 14px; text-align: center;">
-                                        <div style="font-size: 11px; text-transform: uppercase; color: #FFFFFF; font-weight: 700;">Total Net Profit</div>
-                                        <div style="font-size: 22px; color: #FFFFFF; font-weight: 800;">{money(total_net)}</div>
-                                    </td>
-                                </tr>
-                            </table>
-                        </div>
-                        """
-                        st.markdown(summary_html, unsafe_allow_html=True)
+                            """
+                            st.markdown(summary_html, unsafe_allow_html=True)
+                            
+                            summary_pdf_data = generate_reportlab_pdf(
+                                title_summary, d_id, d_name, card_date_str,
+                                total_gross, total_owner, total_net
+                            )
+                            st.download_button(
+                                label=f"Export {title_summary.title()} Summary (PDF)",
+                                data=summary_pdf_data,
+                                file_name=f"MJ7_{title_summary}_{d_id}.pdf",
+                                mime="application/pdf",
+                                key=f"btn_pdf_total_{d_id}"
+                            )
                         
-                        summary_pdf_data = generate_reportlab_pdf(
-                            title_summary, d_id, d_name, card_date_str,
-                            total_gross, total_owner, total_net
-                        )
-                        st.download_button(
-                            label=f"Export {title_summary.title()} Summary (PDF)",
-                            data=summary_pdf_data,
-                            file_name=f"MJ7_{title_summary}_{d_id}.pdf",
-                            mime="application/pdf",
-                            key=f"btn_pdf_total_{d_id}"
-                        )
-                    
-                    st.markdown("<hr style='border: 1px dashed #E2E8F0;'>", unsafe_allow_html=True)
+                        st.markdown("<hr style='border: 1px dashed #E2E8F0;'>", unsafe_allow_html=True)
+            else:
+                st.info("ℹ️ No data available for this selection.")
         else:
             st.warning("No data found for the selected date.")
+
 
 # ====================================
 # TAB 3: DEDUCTIONS
