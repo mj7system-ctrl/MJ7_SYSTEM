@@ -464,18 +464,17 @@ with tabs[2]:
         owner_col: "sum",
         mj7_col: "sum"
     }).reset_index()
+    
+    st.dataframe(
+        performance_matrix.style.format({
+            gross_col: "${:,.2f}",
+            owner_col: "${:,.2f}",
+            mj7_col: "${:,.2f}"
+        }),
+        use_container_width=True
+    )
 else:
-    performance_matrix = pd.DataFrame()
-            
-            st.dataframe(
-                performance_matrix.style.format({
-                    gross_col: "${:,.2f}",
-                    owner_col: "${:,.2f}",
-                    mj7_col: "${:,.2f}"
-                }),
-                use_container_width=True
-            )
-            
+    st.info("ℹ️ No data available for this selection.")
             st.markdown("---")
             st.subheader("Generate Performance Cards")
             target_perf_drivers = st.multiselect(
