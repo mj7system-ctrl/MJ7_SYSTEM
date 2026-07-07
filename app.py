@@ -1514,3 +1514,4 @@ with tabs[10]:
         st.dataframe(df_display.sort_values(by=col_date, ascending=False), use_container_width=True)
     else:
         st.info("No historical entries recorded.")
+        
