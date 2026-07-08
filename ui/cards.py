@@ -1,12 +1,28 @@
 """
 UI Card components for load and settlement displays.
+Handles rendering of performance cards, settlement previews, and metrics.
 """
 
 from utils.helpers import money
 
+
 def render_load_card(load_id, driver_id, driver_name, date_str, gross, owner_pay, mj7_net, logo_html=""):
     """
     Render a load performance card as HTML.
+    Displays load details, driver info, and financial breakdown.
+    
+    Args:
+        load_id: Load identifier
+        driver_id: Driver ID
+        driver_name: Driver full name
+        date_str: Date string for the load
+        gross: Gross amount
+        owner_pay: Owner payment amount
+        mj7_net: MJ7 net profit
+        logo_html: Optional HTML for logo image
+    
+    Returns:
+        HTML string for rendering
     """
     card_html = f"""
     <div style="background-color: #FFFFFF; border: 1px solid #E2E8F0; border-radius: 12px; padding: 24px; margin-bottom: 20px; box-shadow: 0 1px 3px rgba(0,0,0,0.02);">
@@ -42,12 +58,18 @@ def render_load_card(load_id, driver_id, driver_name, date_str, gross, owner_pay
     """
     return card_html
 
+
 def render_settlement_preview(settlement):
     """
-    Render settlement preview as HTML.
-    """
-    from utils.helpers import money
+    Render settlement preview/breakdown as HTML.
+    Shows detailed financial breakdown for a load settlement.
     
+    Args:
+        settlement: SettlementBreakdown object from calculate_settlement()
+    
+    Returns:
+        HTML string for rendering
+    """
     preview_html = f"""
     <div style="background-color: #EFF6FF; border: 2px solid #BFDBFE; border-radius: 12px; padding: 20px; margin-bottom: 20px;">
         <h4 style="margin: 0 0 16px 0; color: #0047AB; font-weight: 700;">Settlement Breakdown</h4>
@@ -86,9 +108,20 @@ def render_settlement_preview(settlement):
     """
     return preview_html
 
+
 def render_metric_card(label, value, unit="", color="#0047AB"):
     """
-    Render a metric card.
+    Render a single metric card.
+    Generic component for displaying KPIs.
+    
+    Args:
+        label: Metric label (e.g., "Total Sales")
+        value: Metric value (will be formatted)
+        unit: Unit suffix (e.g., "units", "USD")
+        color: Hex color for the value text
+    
+    Returns:
+        HTML string for rendering
     """
     card = f"""
     <div style="background-color: #FFFFFF; border: 1px solid #E2E8F0; border-radius: 12px; padding: 20px; text-align: center; box-shadow: 0 1px 3px rgba(0,0,0,0.02);">
