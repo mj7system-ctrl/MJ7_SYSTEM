@@ -4,6 +4,7 @@ MJ7 LOGISTICS CONTROL CENTER - REFACTORED & MODULAR
 ====================================================
 Versión 5.0: Arquitectura limpia, segura y mantenible
 CON MÓDULO AP/AR INTEGRADO
+ÚLTIMA ACTUALIZACIÓN: Correcciones finales aplicadas
 """
 
 import streamlit as st
@@ -300,12 +301,12 @@ def load_data():
     deductions = pd.DataFrame(sh.worksheet("DEDUCTIONS").get_all_records())
     drivers = pd.DataFrame(sh.worksheet("DRIVERS").get_all_records())
     
-    # Cargar hojas opcionales con fallback
+    # Cargar hojas opcionales con fallback - CORREGIDO: EXPENSE_FINANCING
     try:
-        expense_fin = pd.DataFrame(sh.worksheet("EXPENSE_FINANCIAMIENTOS").get_all_records())
+        expense_fin = pd.DataFrame(sh.worksheet("EXPENSE_FINANCING").get_all_records())
     except Exception:
-        expense_fin = pd.DataFrame(columns=[get_col("EXPENSE_FINANCIAMIENTOS", k) 
-                                            for k in COLUMN_MAPS["EXPENSE_FINANCIAMIENTOS"].values()])
+        expense_fin = pd.DataFrame(columns=[get_col("EXPENSE_FINANCING", k) 
+                                            for k in COLUMN_MAPS["EXPENSE_FINANCING"].values()])
     
     try:
         truck_pay = pd.DataFrame(sh.worksheet("TRUCK_PAYMENTS").get_all_records())
@@ -321,7 +322,7 @@ def load_data():
     
     # Convertir fechas
     for df in [loads, settlements, deductions]:
-        for col in ["DATE", "START_DATE", "DELIVERY_DATE"]:
+        for col in [get_col("CARGAS", "start_date"), get_col("CARGAS", "delivery_date"), get_col("SETTLEMENTS", "date"), get_col("DEDUCTIONS", "date")]:
             if col in df.columns:
                 df[col] = pd.to_datetime(df[col], errors='coerce')
     
@@ -422,6 +423,7 @@ with tabs[0]:
 with tabs[1]:
     st.subheader("Closed Settlements History")
     st.dataframe(settlements, use_container_width=True)
+
 # ====================================
 # TAB 2: PERFORMANCE & CARD GENERATOR
 # ====================================
@@ -434,7 +436,6 @@ with tabs[2]:
         st.markdown("---")
         st.subheader("Production Metrics Matrix")
         
-        # ✅ ARREGLADO: date_col siempre definido
         date_col = get_col("SETTLEMENTS", "date")
         settlements[date_col] = pd.to_datetime(settlements[date_col])
         
@@ -695,7 +696,6 @@ with tabs[2]:
         else:
             st.warning("No data found for the selected date.")
 
-#SEGUNDA SECCION PARA IDENTIFICACION INTERNA 
 # ====================================
 # TAB 3: DEDUCTIONS
 # ====================================
@@ -746,7 +746,6 @@ with tabs[4]:
             l_edate = st.date_input("Delivery Date", today)
         
         if st.button("Save Load"):
-            # ✅ Validar con función
             is_valid, error = validate_load_data(l_num, l_comp, l_amt, l_driver)
             if not is_valid:
                 st.error(f"❌ {error}")
@@ -768,7 +767,6 @@ with tabs[4]:
         chosen_load = st.selectbox("Select Load to Settle:", active_codes)
         
         if chosen_load not in ["Select Load", "No logs open"]:
-            # ✅ Usar find_row_by_column (SEGURO)
             ops = SheetsOperations(client, SHEET_NAME)
             match = ops.find_row_by_column(loads, "CARGAS", "load_id", chosen_load)
             
@@ -776,7 +774,6 @@ with tabs[4]:
                 op_assigned = match[driver_col]
                 gross_revenue = safe_float(match[amount_col])
                 
-                # Deductions
                 load_num_col = get_col("DEDUCTIONS", "load_id")
                 ded_type_col = get_col("DEDUCTIONS", "type")
                 ded_amt_col = get_col("DEDUCTIONS", "amount")
@@ -785,7 +782,6 @@ with tabs[4]:
                 fuel_deductions = safe_float(associated_costs[associated_costs[ded_type_col] == "FUEL"][ded_amt_col].sum())
                 other_deductions = safe_float(associated_costs[associated_costs[ded_type_col] == "OTHER"][ded_amt_col].sum())
                 
-                # ✅ Usar calculate_settlement (centralizado)
                 aplicar_factoring = st.checkbox("Apply Factoring Fee (2.15%) to this load?", value=True)
                 settlement = calculate_settlement(
                     gross_revenue=gross_revenue,
@@ -794,18 +790,16 @@ with tabs[4]:
                     apply_factoring=aplicar_factoring
                 )
                 
-                # ✅ Validar
                 error = validate_settlement(settlement)
                 if error:
                     st.error(f"❌ Settlement error: {error}")
                 else:
-                    # ✅ Renderizar preview (reutilizable)
                     st.markdown(render_settlement_preview(settlement), unsafe_allow_html=True)
                     
                     st.write("")
                     if not associated_costs.empty:
                         st.markdown("### Linked Deductions Breakdown")
-                        df_view = associated_costs[[ded_type_col, "CONCEPT", ded_amt_col]].copy()
+                        df_view = associated_costs[[ded_type_col, get_col("DEDUCTIONS", "concept"), ded_amt_col]].copy()
                         df_view.columns = ["Category", "Description", "Amount ($)"]
                         st.dataframe(df_view, use_container_width=True, hide_index=True)
                     else:
@@ -817,11 +811,9 @@ with tabs[4]:
                         ws_settlements = get_ws("SETTLEMENTS")
                         settle_load_col = get_col("SETTLEMENTS", "load_id")
                         
-                        # Verificar que no esté ya liquidada
                         if chosen_load in ws_settlements.col_values(list(ws_settlements.row_values(1)).index(settle_load_col) + 1):
                             st.error("❌ This load has already been settled.")
                         else:
-                            # ✅ Añadir settlement
                             l_date = datetime.now().strftime('%Y-%m-%d')
                             settle_date_col = get_col("SETTLEMENTS", "date")
                             settle_driver_col = get_col("SETTLEMENTS", "driver_id")
@@ -843,7 +835,6 @@ with tabs[4]:
                             ]
                             ws_settlements.append_row(new_settlement)
                             
-                            # ✅ Actualizar status (SEGURO)
                             ws_loads = get_ws("CARGAS")
                             ops.update_cell_by_column(
                                 ws=ws_loads,
@@ -862,14 +853,22 @@ with tabs[4]:
     
     # ============ MODIFY / RE-SETTLE ============
     elif flow == "Modify / Re-Settle Load":
+        load_id_col = get_col("CARGAS", "load_id")
+        status_col = get_col("CARGAS", "status")
+        amount_col = get_col("CARGAS", "amount")
+        driver_col = get_col("CARGAS", "driver_id")
+        
         all_loads = ["Select Load"] + sorted(loads[load_id_col].astype(str).unique().tolist()) if not loads.empty else []
         edit_load_id = st.selectbox("Select load to modify:", all_loads)
         
         if edit_load_id and edit_load_id != "Select Load":
+            ops = SheetsOperations(client, SHEET_NAME)
             load_match = ops.find_row_by_column(loads, "CARGAS", "load_id", edit_load_id)
             
             if load_match is not None:
                 company_col = get_col("CARGAS", "company")
+                driver_col_real = get_col("DRIVERS", "driver_id")
+                
                 e_comp = st.text_input("Broker / Client Name", value=load_match[company_col])
                 e_amt = st.number_input("Gross Amount ($)", value=safe_float(load_match[amount_col]), format="%.2f")
                 e_stat = st.selectbox("Status", ["PENDING", "IN TRANSIT", "DELIVERED", "CLOSED / SETTLED"],
@@ -921,10 +920,12 @@ with tabs[4]:
     
     # ============ REGISTER DEDUCTION ============
     elif flow == "Register Deduction":
+        driver_col_real = get_col("DRIVERS", "driver_id")
         driver_pool = sorted_unique_safe(drivers[driver_col_real]) if not drivers.empty else []
         selected_driver = st.selectbox("Filter by Driver:", ["Select Driver"] + driver_pool)
         
         if selected_driver != "Select Driver":
+            load_id_col = get_col("CARGAS", "load_id")
             carga_driver_col = get_col("CARGAS", "driver_id")
             allowed_loads = loads[loads[carga_driver_col].astype(str) == selected_driver][load_id_col].astype(str).unique()
             
@@ -941,15 +942,6 @@ with tabs[4]:
                         d_vcost = st.number_input("Total Amount ($)", min_value=0.0, step=1.00, format="%.2f")
                     
                     if st.form_submit_button("Save Deduction"):
-                        ded_date_col = get_col("DEDUCTIONS", "date")
-                        ded_load_col = get_col("DEDUCTIONS", "load_id")
-                        ded_driver_col = get_col("DEDUCTIONS", "driver_id")
-                        ded_type_col = get_col("DEDUCTIONS", "type")
-                        ded_concept_col = get_col("DEDUCTIONS", "concept")
-                        ded_qty_col = get_col("DEDUCTIONS", "qty_gallons")
-                        ded_posted_col = get_col("DEDUCTIONS", "posted_date")
-                        ded_amount_col = get_col("DEDUCTIONS", "amount")
-                        
                         new_ded = [
                             str(d_fdate),
                             d_cload,
@@ -1015,13 +1007,15 @@ with tabs[5]:
         search_mode = st.radio("Search By:", ["Load ID", "Driver ID"], horizontal=False)
     
     with col_search_input:
+        load_id_col = get_col("CARGAS", "load_id")
         if search_mode == "Load ID":
             query_string = st.text_input("Enter Load ID:", placeholder="e.g., 4052")
             filtered_results = loads[loads[load_id_col].astype(str).str.contains(query_string, case=False)] if query_string else loads
         else:
-            driver_list = ["Select Driver"] + sorted_unique_safe(loads[get_col("CARGAS", "driver_id")])
+            carga_driver_col = get_col("CARGAS", "driver_id")
+            driver_list = ["Select Driver"] + sorted_unique_safe(loads[carga_driver_col])
             selected_driver = st.selectbox("Select Driver:", driver_list)
-            filtered_results = loads[loads[get_col("CARGAS", "driver_id")].astype(str) == selected_driver] if selected_driver != "Select Driver" else loads
+            filtered_results = loads[loads[carga_driver_col].astype(str) == selected_driver] if selected_driver != "Select Driver" else loads
     
     st.markdown("---")
     st.markdown(f"**Records Found:** `{len(filtered_results)}` entries")
@@ -1067,7 +1061,6 @@ with tabs[6]:
         
         df_display = df_source.copy()
         
-        # Merge con drivers si aplica
         if get_col("SETTLEMENTS", "driver_id") in df_display.columns:
             drivers_copy = drivers[[get_col("DRIVERS", "driver_id"), get_col("DRIVERS", "full_name")]].copy()
             drivers_copy[get_col("DRIVERS", "driver_id")] = drivers_copy[get_col("DRIVERS", "driver_id")].astype(str)
@@ -1084,7 +1077,6 @@ with tabs[6]:
             elements_list.append(Paragraph(f"TOTAL MJ7 NET: ${sum_mj7:,.2f} | TOTAL OWNER: ${sum_owner:,.2f}", total_style))
             elements_list.append(Spacer(1, 10))
         
-        # Tabla
         cols = df_display.columns.to_list()
         table_data = [[Paragraph(f"<b>{str(c).replace('_', ' ')}</b>", text_styles['Normal']) for c in cols]]
         
@@ -1155,9 +1147,8 @@ with tabs[6]:
                                  f"MJ7_Fuel_Audit_{datetime.now().strftime('%Y%m%d')}.pdf", "application/pdf")
             else:
                 st.warning("⚠️ No fuel records found.")
-
 # ====================================
-# TAB 7: STATUS VERIFICATION
+# TAB 7: STATUS VERIFICATION - CORREGIDO
 # ====================================
 
 with tabs[7]:
@@ -1166,14 +1157,14 @@ with tabs[7]:
     st.divider()
     
     if not loads.empty:
-        # ✅ Usar nombres de columna CORRECTOS
-        load_id_col_name = "LOAD"
-        status_col_name = "STATUS"
-        company_col_name = "COMPANY"
-        driver_col_name = "DRIVER_ID"
-        delivery_col_name = "DELIVERY_DATE"
-        origin_col_name = "ORIGIN"
-        destination_col_name = "DESTINATION"
+        # ✅ CORREGIDO: Usar get_col() en lugar de hardcoding
+        load_id_col_name = get_col("CARGAS", "load_id")
+        status_col_name = get_col("CARGAS", "status")
+        company_col_name = get_col("CARGAS", "company")
+        driver_col_name = get_col("CARGAS", "driver_id")
+        delivery_col_name = get_col("CARGAS", "delivery_date")
+        origin_col_name = get_col("CARGAS", "origin")
+        destination_col_name = get_col("CARGAS", "destination")
         
         loads_alerts = loads.copy()
         loads_alerts["DELIVERY_DATE_DT"] = pd.to_datetime(loads_alerts[delivery_col_name], errors='coerce').dt.date
@@ -1310,9 +1301,8 @@ with tabs[7]:
     else:
         st.info("ℹ️ No active load records.")
 
-# SECCION 3 PARA IDENTIFICACION INTERNA 
 # ====================================
-# TAB 8: EXPENSE FINANCING
+# TAB 8: EXPENSE FINANCING - CORREGIDO
 # ====================================
 
 with tabs[8]:
@@ -1344,7 +1334,8 @@ with tabs[8]:
                             fridays.append(d.strftime('%Y-%m-%d'))
                     
                     try:
-                        ws_fin = get_ws("EXPENSE_FINANCIAMIENTOS")
+                        # ✅ CORREGIDO: Usar EXPENSE_FINANCING en lugar de EXPENSE_FINANCIAMIENTOS
+                        ws_fin = get_ws("EXPENSE_FINANCING")
                         new_row = [f"FIN-{int(datetime.now().timestamp())}", f_driver, f_truck, f_concept, total_pay, 0] + fridays
                         ws_fin.append_row(new_row)
                         st.success("✅ Financing agreement created!")
@@ -1356,15 +1347,15 @@ with tabs[8]:
         st.markdown("<h5 style='color:#1E293B; margin-bottom:15px;'>Record Payment</h5>", unsafe_allow_html=True)
         
         if not expense_fin.empty:
-            fin_paid_col = get_col("EXPENSE_FINANCIAMIENTOS", "installments_paid")
-            fin_total_col = get_col("EXPENSE_FINANCIAMIENTOS", "total_to_pay")
+            fin_paid_col = get_col("EXPENSE_FINANCING", "installments_paid")
+            fin_total_col = get_col("EXPENSE_FINANCING", "total_to_pay")
             active = expense_fin[expense_fin[fin_paid_col].astype(float) < expense_fin[fin_total_col].astype(float)]
             
             if not active.empty:
                 with st.form("form_fin_payment", clear_on_submit=True):
-                    fin_driver_col = get_col("EXPENSE_FINANCIAMIENTOS", "driver")
-                    fin_id_col = get_col("EXPENSE_FINANCIAMIENTOS", "id_fin")
-                    fin_concept_col = get_col("EXPENSE_FINANCIAMIENTOS", "concept")
+                    fin_driver_col = get_col("EXPENSE_FINANCING", "driver")
+                    fin_id_col = get_col("EXPENSE_FINANCING", "id_fin")
+                    fin_concept_col = get_col("EXPENSE_FINANCING", "concept")
                     
                     opts = active.apply(lambda r: f"{r[fin_driver_col]} ({r[fin_concept_col]}) | {r[fin_id_col]}", axis=1).tolist()
                     sel = st.selectbox("Agreement", opts)
@@ -1376,7 +1367,7 @@ with tabs[8]:
                             st.error("❌ Amount > 0 required.")
                         else:
                             try:
-                                ws_fin = get_ws("EXPENSE_FINANCIAMIENTOS")
+                                ws_fin = get_ws("EXPENSE_FINANCING")
                                 cell = ws_fin.find(sel_id)
                                 current_paid = safe_float(ws_fin.cell(cell.row, 6).value or 0)
                                 total_val = safe_float(ws_fin.cell(cell.row, 5).value or 0)
@@ -1395,16 +1386,19 @@ with tabs[8]:
     st.markdown("### Active Agreements")
     
     if not expense_fin.empty:
+        fin_total_col = get_col("EXPENSE_FINANCING", "total_to_pay")
+        fin_paid_col = get_col("EXPENSE_FINANCING", "installments_paid")
+        
         for _, row in expense_fin.iterrows():
             total_val = safe_float(row[fin_total_col])
             paid = safe_float(row[fin_paid_col])
             debt = max(0, total_val - paid)
             pct = min(100, (paid / total_val * 100)) if total_val > 0 else 0
             
-            fin_driver_col = get_col("EXPENSE_FINANCIAMIENTOS", "driver")
-            fin_truck_col = get_col("EXPENSE_FINANCIAMIENTOS", "truck_id")
-            fin_concept_col = get_col("EXPENSE_FINANCIAMIENTOS", "concept")
-            fin_id_col = get_col("EXPENSE_FINANCIAMIENTOS", "id_fin")
+            fin_driver_col = get_col("EXPENSE_FINANCING", "driver")
+            fin_truck_col = get_col("EXPENSE_FINANCING", "truck_id")
+            fin_concept_col = get_col("EXPENSE_FINANCING", "concept")
+            fin_id_col = get_col("EXPENSE_FINANCING", "id_fin")
             
             card = f"""
             <div class="financing-card-container">
@@ -1510,14 +1504,14 @@ with tabs[9]:
     st.markdown("### Truck Equity Portfolios")
     
     if not truck_pay.empty:
+        truck_total_col = get_col("TRUCK_PAYMENTS", "total_value")
+        truck_paid_col = get_col("TRUCK_PAYMENTS", "total_paid")
+        truck_amort_col = get_col("TRUCK_PAYMENTS", "weekly_amortization")
+        truck_driver_col = get_col("TRUCK_PAYMENTS", "driver")
+        truck_id_col = get_col("TRUCK_PAYMENTS", "truck_id")
+        truck_date_col = get_col("TRUCK_PAYMENTS", "start_date")
+        
         for _, row in truck_pay.iterrows():
-            truck_total_col = get_col("TRUCK_PAYMENTS", "total_value")
-            truck_paid_col = get_col("TRUCK_PAYMENTS", "total_paid")
-            truck_amort_col = get_col("TRUCK_PAYMENTS", "weekly_amortization")
-            truck_driver_col = get_col("TRUCK_PAYMENTS", "driver")
-            truck_id_col = get_col("TRUCK_PAYMENTS", "truck_id")
-            truck_date_col = get_col("TRUCK_PAYMENTS", "start_date")
-            
             t_val = safe_float(row[truck_total_col])
             t_paid = safe_float(row[truck_paid_col])
             t_rem = max(0, t_val - t_paid)
@@ -1555,7 +1549,7 @@ with tabs[9]:
             st.progress(min(1.0, pct / 100))
 
 # ====================================
-# TAB 10: DISPATCH TRACKER
+# TAB 10: DISPATCH TRACKER - CORREGIDO
 # ====================================
 
 with tabs[10]:
@@ -1577,10 +1571,25 @@ with tabs[10]:
                 if not p_concept or p_amount <= 0:
                     st.error("❌ Concept and amount required.")
                 else:
+                    # ✅ CORREGIDO: Guardar con todas las columnas correctas
                     valor = p_amount if "Credit" in p_type else -p_amount
                     try:
                         ws_disp = get_ws("DISPATCH_TRACKER")
-                        ws_disp.append_row([p_date.strftime('%Y-%m-%d'), p_name, p_concept, valor])
+                        disp_date_col = get_col("DISPATCH_TRACKER", "date")
+                        disp_month_col = get_col("DISPATCH_TRACKER", "month")
+                        disp_concept_col = get_col("DISPATCH_TRACKER", "concept")
+                        disp_amount_col = get_col("DISPATCH_TRACKER", "amount")
+                        disp_type_col = get_col("DISPATCH_TRACKER", "type")
+                        
+                        # Guardar con todas las columnas: DATE, MONTH, CONCEPT, AMOUNT, TYPE
+                        new_row = [
+                            p_date.strftime('%Y-%m-%d'),  # DATE
+                            p_date.strftime('%B'),         # MONTH
+                            p_concept,                     # CONCEPT
+                            valor,                         # AMOUNT
+                            "Credit" if valor > 0 else "Debit"  # TYPE
+                        ]
+                        ws_disp.append_row(new_row)
                         st.success("✅ Movement recorded!")
                         st.cache_data.clear()
                     except Exception as e:
@@ -1589,15 +1598,16 @@ with tabs[10]:
     with col_p2:
         if not dispatch_track.empty:
             disp_date_col = get_col("DISPATCH_TRACKER", "date")
-            disp_person_col = get_col("DISPATCH_TRACKER", "person")
             disp_concept_col = get_col("DISPATCH_TRACKER", "concept")
             disp_amount_col = get_col("DISPATCH_TRACKER", "amount")
             
-            df_acc = dispatch_track[[disp_date_col, disp_person_col, disp_concept_col, disp_amount_col]].copy()
+            # ✅ CORREGIDO: Usar "concept" en lugar de "person"
+            df_acc = dispatch_track[[disp_date_col, disp_concept_col, disp_amount_col]].copy()
+            df_acc.columns = ["Date", "Concept", "Amount"]
             df_acc[disp_amount_col] = safe_to_numeric(df_acc[disp_amount_col], errors='coerce').fillna(0)
             
-            sel_person = st.selectbox("Select Person", df_acc[disp_person_col].unique())
-            df_sel = df_acc[df_acc[disp_person_col] == sel_person].sort_values(disp_date_col)
+            sel_concept = st.selectbox("Select Concept", df_acc[disp_concept_col].unique())
+            df_sel = df_acc[df_acc[disp_concept_col] == sel_concept].sort_values(disp_date_col)
             df_sel["BALANCE"] = df_sel[disp_amount_col].cumsum()
             
             saldo = safe_float(df_sel["BALANCE"].iloc[-1]) if len(df_sel) > 0 else 0
@@ -1605,13 +1615,13 @@ with tabs[10]:
             
             st.markdown(f"""
             <div style="background-color: #F8FAFC; padding: 15px; border-radius: 10px; border-left: 5px solid {color}; border: 1px solid #E2E8F0;">
-                <h5 style="margin:0; color:#64748B;">Balance: {sel_person}</h5>
+                <h5 style="margin:0; color:#64748B;">Balance: {sel_concept}</h5>
                 <p style="margin:5px 0 0 0; font-size: 28px; font-weight: bold; color:{color};">{money(saldo)}</p>
             </div>
             """, unsafe_allow_html=True)
             
             st.write("")
-            fig = px.line(df_sel, x=disp_date_col, y="BALANCE", markers=True, title=f"Account History: {sel_person}")
+            fig = px.line(df_sel, x=disp_date_col, y="BALANCE", markers=True, title=f"Account History: {sel_concept}")
             fig.add_hline(y=0, line_dash="dash", line_color="gray")
             st.plotly_chart(fig, use_container_width=True)
         else:
@@ -1621,11 +1631,12 @@ with tabs[10]:
     st.markdown("### Historical Ledger")
     
     if not dispatch_track.empty:
+        disp_date_col = get_col("DISPATCH_TRACKER", "date")
         st.dataframe(dispatch_track.sort_values(disp_date_col, ascending=False), use_container_width=True)
     else:
         st.info("ℹ️ No history.")
-      # ====================================
-# TAB 11: ACCOUNTS PAYABLE / RECEIVABLE
+# ====================================
+# TAB 11: ACCOUNTS PAYABLE / RECEIVABLE - CORREGIDO
 # ====================================
 
 with tabs[11]:
@@ -1654,6 +1665,16 @@ with tabs[11]:
         st.error(f"❌ Error loading AP/AR data: {e}")
         ap_df = pd.DataFrame()
         ar_df = pd.DataFrame()
+    
+    # ✅ CORREGIDO: Función para obtener índices dinámicos en lugar de hardcoding
+    def get_column_index_ap_ar(ws, sheet_name, logical_col_name):
+        """Obtener índice dinámico de columna en AP/AR sheets."""
+        try:
+            header_row = ws.row_values(1)
+            actual_col_name = get_col(sheet_name, logical_col_name)
+            return header_row.index(actual_col_name) + 1
+        except (ValueError, IndexError):
+            raise ValueError(f"Column '{actual_col_name}' not found in {sheet_name}")
     
     # Create tabs for AP and AR
     ap_tab, ar_tab = st.tabs(["📤 ACCOUNTS PAYABLE", "📥 ACCOUNTS RECEIVABLE"])
@@ -1774,13 +1795,15 @@ with tabs[11]:
                             # Find row by invoice number
                             cell = ws_ap.find(selected_invoice)
                             if cell:
+                                # ✅ CORREGIDO: Obtener índices dinámicamente
+                                status_col_idx = get_column_index_ap_ar(ws_ap, ap_sheet, "status")
+                                payment_date_col_idx = get_column_index_ap_ar(ws_ap, ap_sheet, "payment_date")
+                                
                                 # Update STATUS to PAID
-                                status_col_idx = 8  # STATUS is typically column 8
                                 ws_ap.update_cell(cell.row, status_col_idx, "PAID")
                                 
                                 # Update PAYMENT_DATE
-                                payment_col_idx = 9  # PAYMENT_DATE is typically column 9
-                                ws_ap.update_cell(cell.row, payment_col_idx, str(payment_date_ap))
+                                ws_ap.update_cell(cell.row, payment_date_col_idx, str(payment_date_ap))
                                 
                                 st.success("✅ Invoice marked as PAID!")
                                 st.cache_data.clear()
@@ -1930,13 +1953,15 @@ with tabs[11]:
                             # Find row by invoice number
                             cell = ws_ar.find(selected_invoice)
                             if cell:
+                                # ✅ CORREGIDO: Obtener índices dinámicamente
+                                status_col_idx = get_column_index_ap_ar(ws_ar, ar_sheet, "status")
+                                payment_date_col_idx = get_column_index_ap_ar(ws_ar, ar_sheet, "payment_date")
+                                
                                 # Update STATUS to PAID
-                                status_col_idx = 8  # STATUS is typically column 8
                                 ws_ar.update_cell(cell.row, status_col_idx, "PAID")
                                 
                                 # Update PAYMENT_DATE
-                                payment_col_idx = 9  # PAYMENT_DATE is typically column 9
-                                ws_ar.update_cell(cell.row, payment_col_idx, str(payment_date_ar))
+                                ws_ar.update_cell(cell.row, payment_date_col_idx, str(payment_date_ar))
                                 
                                 st.success("✅ Invoice marked as PAID!")
                                 st.cache_data.clear()
@@ -1970,5 +1995,9 @@ with tabs[11]:
         else:
             st.info("ℹ️ No data.")
 
+# ====================================
+# FOOTER
+# ====================================
+
 st.divider()
-st.caption("MJ7 Logistics Control Center v5.0 | Powered by Streamlit + Google Sheets")
+st.caption("🚛 MJ7 Logistics Control Center v5.0 | Powered by Streamlit + Google Sheets | Last Updated: 2024")
