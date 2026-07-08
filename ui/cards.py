@@ -70,10 +70,8 @@ def render_settlement_preview(settlement):
     Returns:
         HTML string for rendering
     """
-    preview_html = f"""
-    <div style="background-color: #EFF6FF; border: 2px solid #BFDBFE; border-radius: 12px; padding: 20px; margin-bottom: 20px;">
+    preview_html = f"""<div style="background-color: #EFF6FF; border: 2px solid #BFDBFE; border-radius: 12px; padding: 20px; margin-bottom: 20px;">
         <h4 style="margin: 0 0 16px 0; color: #0047AB; font-weight: 700;">Settlement Breakdown</h4>
-        
         <table style="width: 100%; font-size: 14px; color: #0F172A;">
             <tr style="border-bottom: 1px solid #BFDBFE;">
                 <td style="padding: 10px 0; font-weight: 600;">Gross Revenue:</td>
@@ -104,8 +102,7 @@ def render_settlement_preview(settlement):
                 <td style="padding: 12px 0; text-align: right; font-weight: 700; color: #0047AB; font-size: 16px;">{money(settlement.mj7_final)}</td>
             </tr>
         </table>
-    </div>
-    """
+    </div>"""
     return preview_html
 
 
