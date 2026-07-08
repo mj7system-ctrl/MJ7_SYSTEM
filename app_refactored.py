@@ -695,7 +695,7 @@ with tabs[2]:
         else:
             st.warning("No data found for the selected date.")
 
-
+#SEGUNDA SECCION PARA IDENTIFICACION INTERNA 
 # ====================================
 # TAB 3: DEDUCTIONS
 # ====================================
@@ -1310,7 +1310,7 @@ with tabs[7]:
     else:
         st.info("ℹ️ No active load records.")
 
-
+# SECCION 3 PARA IDENTIFICACION INTERNA 
 # ====================================
 # TAB 8: EXPENSE FINANCING
 # ====================================
