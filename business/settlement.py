@@ -27,7 +27,7 @@ def calculate_settlement(gross_revenue, fuel_deductions=0.0, other_deductions=0.
     Flow:
     1. Gross Revenue
     2. Subtract fuel & other deductions
-    3. Subtract dispatch fee (10%)
+    3. Subtract dispatch fee (5%)
     4. If enabled, subtract factoring fee (2.15%)
     5. Remainder = Owner final payment
     6. MJ7 keeps dispatch + factoring
@@ -49,7 +49,7 @@ def calculate_settlement(gross_revenue, fuel_deductions=0.0, other_deductions=0.
     subtotal_deductions = fuel_deductions + other_deductions
     
     # Calculate dispatch fee (10% of gross)
-    dispatch_fee = gross_revenue * 0.10
+    dispatch_fee = gross_revenue * 0.05
     
     # Calculate amount before factoring
     before_factoring = gross_revenue - subtotal_deductions - dispatch_fee
