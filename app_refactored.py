@@ -73,6 +73,15 @@ for key, value in session_defaults.items():
         st.session_state[key] = value
 
 # ====================================
+# UTILIDADES
+# ====================================
+
+def get_ws(sheet_name):
+    """Obtener worksheet por nombre."""
+    sh = client.open(SHEET_NAME)
+    return sh.worksheet(sheet_name)
+
+# ====================================
 # ESTILOS GLOBALES
 # ====================================
 
@@ -301,7 +310,7 @@ def load_data():
     deductions = pd.DataFrame(sh.worksheet("DEDUCTIONS").get_all_records())
     drivers = pd.DataFrame(sh.worksheet("DRIVERS").get_all_records())
     
-    # Cargar hojas opcionales con fallback - CORREGIDO: EXPENSE_FINANCING
+    # Cargar hojas opcionales con fallback
     try:
         expense_fin = pd.DataFrame(sh.worksheet("EXPENSE_FINANCING").get_all_records())
     except Exception:
@@ -408,6 +417,658 @@ tabs = st.tabs([
     ":material/account_balance: AP/AR Management"
 ])
 
+# ====================================
+# TAB 0: LOADS
+# ====================================
+
+with tabs[0]:
+    st.subheader("General Loads Registry")
+    st.dataframe(loads, use_container_width=True)
+
+# ====================================
+# TAB 1: SETTLEMENTS
+# ====================================
+
+with tabs[1]:
+    st.subheader("Closed Settlements History")
+    st.dataframe(settlements, use_container_width=True)
+
+# ====================================
+# TAB 2: PERFORMANCE & CARD GENERATOR
+# ====================================
+
+with tabs[2]:
+    st.subheader("Driver Performance Overview")
+    st.dataframe(drivers, use_container_width=True)
+    
+    if not settlements.empty:
+        st.markdown("---")
+        st.subheader("Production Metrics Matrix")
+        
+        # ✅ ARREGLADO: date_col siempre definido
+        date_col = get_col("SETTLEMENTS", "date")
+        settlements[date_col] = pd.to_datetime(settlements[date_col])
+        
+        col_date1, col_date2 = st.columns([1, 2])
+        with col_date1:
+            filter_type = st.radio("Filter views:", ["All Time", "Specific Day"], horizontal=True)
+        
+        selected_date = None
+        settlements_filtered = settlements.copy()
+        
+        if filter_type == "Specific Day":
+            with col_date2:
+                selected_date = st.date_input("Select target date:", value=settlements[date_col].max().date())
+            settlements_filtered = settlements_filtered[settlements_filtered[date_col].dt.date == selected_date]
+        
+        if not settlements_filtered.empty:
+            load_col = get_col("SETTLEMENTS", "load_id")
+            gross_col = get_col("SETTLEMENTS", "gross")
+            owner_col = get_col("SETTLEMENTS", "owner_pay")
+            mj7_col = get_col("SETTLEMENTS", "mj7_net")
+            driver_col = get_col("SETTLEMENTS", "driver_id")
+            
+            if not settlements_filtered.empty and driver_col in settlements_filtered.columns and load_col in settlements_filtered.columns:
+                performance_matrix = settlements_filtered.groupby([driver_col, load_col]).agg({
+                    gross_col: "sum",
+                    owner_col: "sum",
+                    mj7_col: "sum"
+                }).reset_index()
+                
+                st.dataframe(
+                    performance_matrix.style.format({
+                        gross_col: "${:,.2f}",
+                        owner_col: "${:,.2f}",
+                        mj7_col: "${:,.2f}"
+                    }),
+                    use_container_width=True
+                )
+                
+                st.markdown("---")
+                st.subheader("Generate Performance Cards")
+                target_perf_drivers = st.multiselect(
+                    "Select drivers to generate cards:",
+                    performance_matrix[driver_col].unique()
+                )
+                
+                if target_perf_drivers:
+                    try:
+                        with open("logo.jpeg", "rb") as image_file:
+                            encoded_logo = base64.b64encode(image_file.read()).decode()
+                        logo_html_tag = f'<img src="data:image/jpeg;base64,{encoded_logo}" style="height: 36px; border-radius: 4px; border: 1px solid #E2E8F0;">'
+                    except Exception:
+                        logo_html_tag = ''
+                    
+                    def generate_reportlab_pdf(title_suffix, driver_id, name_str, date_str, gross, owner_pay, mj7_net):
+                        """Generar PDF con ReportLab."""
+                        pdf_buffer = io.BytesIO()
+                        doc = SimpleDocTemplate(
+                            pdf_buffer,
+                            pagesize=(600, 260),
+                            rightMargin=20, leftMargin=20, topMargin=20, bottomMargin=20
+                        )
+                        
+                        styles = getSampleStyleSheet()
+                        title_style = ParagraphStyle(
+                            'CardTitle', fontName='Helvetica-Bold', fontSize=14, leading=16,
+                            textColor=colors.HexColor("#1E293B")
+                        )
+                        info_style = ParagraphStyle(
+                            'DriverInfo', fontName='Helvetica-Bold', fontSize=11, leading=14,
+                            textColor=colors.HexColor("#334155")
+                        )
+                        label_style = ParagraphStyle(
+                            'MetricLabel', fontName='Helvetica-Bold', fontSize=9, leading=11,
+                            textColor=colors.HexColor("#64748B")
+                        )
+                        value_style = ParagraphStyle(
+                            'MetricValue', fontName='Helvetica-Bold', fontSize=18, leading=22,
+                            textColor=colors.HexColor("#1E293B")
+                        )
+                        net_label_style = ParagraphStyle(
+                            'NetLabel', fontName='Helvetica-Bold', fontSize=9, leading=11,
+                            textColor=colors.HexColor("#1E40AF")
+                        )
+                        net_value_style = ParagraphStyle(
+                            'NetValue', fontName='Helvetica-Bold', fontSize=18, leading=22,
+                            textColor=colors.HexColor("#1D4ED8")
+                        )
+                        
+                        story = []
+                        
+                        # Header
+                        header_text = f"<b>MJ7 LOGISTICS CENTER — {title_suffix}</b><br/><font color='#64748B'>Date: {date_str}</font>"
+                        header_p = Paragraph(header_text, title_style)
+                        header_data = [[header_p, ""]]
+                        
+                        if os.path.exists("logo.jpeg"):
+                            try:
+                                logo_img = RLImage("logo.jpeg", width=70, height=35)
+                                header_data = [[header_p, logo_img]]
+                            except:
+                                pass
+                        
+                        header_table = Table(header_data, colWidths=[470, 90])
+                        header_table.setStyle(TableStyle([
+                            ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+                            ('ALIGN', (1, 0), (1, 0), 'RIGHT'),
+                            ('LINEBELOW', (0, 0), (-1, -1), 1, colors.HexColor("#E2E8F0")),
+                            ('BOTTOMPADDING', (0, 0), (-1, -1), 12),
+                        ]))
+                        story.append(header_table)
+                        story.append(Spacer(1, 12))
+                        
+                        # Driver info
+                        info_p = Paragraph(f"DRIVER ID: {driver_id} &nbsp;&nbsp;|&nbsp;&nbsp; NAME: {name_str}", info_style)
+                        info_table = Table([[info_p]], colWidths=[560])
+                        info_table.setStyle(TableStyle([
+                            ('BACKGROUND', (0, 0), (-1, -1), colors.HexColor("#F8FAFC")),
+                            ('PADDING', (0, 0), (-1, -1), 8),
+                            ('BOTTOMPADDING', (0, 0), (-1, -1), 10),
+                        ]))
+                        story.append(info_table)
+                        story.append(Spacer(1, 15))
+                        
+                        # Metrics
+                        box_gross = [
+                            Paragraph("TOTAL GROSS", label_style),
+                            Spacer(1, 8),
+                            Paragraph(f"${gross:,.2f}", value_style)
+                        ]
+                        box_owner = [
+                            Paragraph("OWNER PAY", label_style),
+                            Spacer(1, 8),
+                            Paragraph(f"${owner_pay:,.2f}", value_style)
+                        ]
+                        box_net = [
+                            Paragraph("MJ7 NET PROFIT", net_label_style),
+                            Spacer(1, 8),
+                            Paragraph(f"${mj7_net:,.2f}", net_value_style)
+                        ]
+                        
+                        metrics_table = Table([[box_gross, box_owner, box_net]], colWidths=[180, 180, 200])
+                        metrics_table.setStyle(TableStyle([
+                            ('BACKGROUND', (0, 0), (0, 0), colors.HexColor("#F8FAFC")),
+                            ('BACKGROUND', (1, 0), (1, 0), colors.HexColor("#F8FAFC")),
+                            ('BACKGROUND', (2, 0), (2, 0), colors.HexColor("#EFF6FF")),
+                            ('BOX', (0, 0), (0, 0), 1, colors.HexColor("#E2E8F0")),
+                            ('BOX', (1, 0), (1, 0), 1, colors.HexColor("#E2E8F0")),
+                            ('BOX', (2, 0), (2, 0), 1, colors.HexColor("#BFDBFE")),
+                            ('PADDING', (0, 0), (-1, -1), 12),
+                            ('VALIGN', (0, 0), (-1, -1), 'TOP'),
+                        ]))
+                        story.append(metrics_table)
+                        
+                        doc.build(story)
+                        return pdf_buffer.getvalue()
+                    
+                    # Renderizar tarjetas
+                    for d_id in target_perf_drivers:
+                        driver_loads = performance_matrix[performance_matrix[driver_col] == d_id]
+                        
+                        try:
+                            d_name = drivers[drivers[get_col("DRIVERS", "driver_id")].astype(str) == str(d_id)][
+                                get_col("DRIVERS", "full_name")
+                            ].iloc[0]
+                        except Exception:
+                            d_name = "Unknown Driver"
+                        
+                        st.write(f"### Performance Report: {d_name} ({d_id})")
+                        
+                        # Tarjetas individuales
+                        for _, load_row in driver_loads.iterrows():
+                            current_load_id = load_row[load_col]
+                            card_date_str = selected_date.strftime('%Y-%m-%d') if filter_type == "Specific Day" else datetime.now().strftime('%Y-%m-%d')
+                            
+                            card_html = render_load_card(
+                                load_id=current_load_id,
+                                driver_id=d_id,
+                                driver_name=d_name,
+                                date_str=card_date_str,
+                                gross=safe_float(load_row[gross_col]),
+                                owner_pay=safe_float(load_row[owner_col]),
+                                mj7_net=safe_float(load_row[mj7_col]),
+                                logo_html=logo_html_tag
+                            )
+                            st.markdown(card_html, unsafe_allow_html=True)
+                            
+                            pdf_data = generate_reportlab_pdf(
+                                f"LOAD {current_load_id}", d_id, d_name, card_date_str,
+                                safe_float(load_row[gross_col]),
+                                safe_float(load_row[owner_col]),
+                                safe_float(load_row[mj7_col])
+                            )
+                            st.download_button(
+                                label=f"Export Load Card {current_load_id} (PDF)",
+                                data=pdf_data,
+                                file_name=f"MJ7_Load_{current_load_id}_{d_id}.pdf",
+                                mime="application/pdf",
+                                key=f"btn_pdf_{d_id}_{current_load_id}"
+                            )
+                        
+                        # Resumen
+                        if len(driver_loads) > 1:
+                            total_gross = driver_loads[gross_col].sum()
+                            total_owner = driver_loads[owner_col].sum()
+                            total_net = driver_loads[mj7_col].sum()
+                            
+                            title_summary = "DAILY TOTALS" if filter_type == "Specific Day" else "ACCUMULATED TOTALS"
+                            subtitle_summary = f"Summary of {len(driver_loads)} loads for {card_date_str}" if filter_type == "Specific Day" else f"Summary of {len(driver_loads)} loads"
+                            
+                            summary_html = f"""
+                            <div style="background-color: #F1F5F9; border: 2px dashed #CBD5E1; border-radius: 12px; padding: 24px; margin-top: 15px; margin-bottom: 8px;">
+                                <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #CBD5E1; padding-bottom: 16px; margin-bottom: 16px;">
+                                    <div>
+                                        <h4 style="margin: 0; color: #0F172A; font-size: 14px; letter-spacing: 0.5px; font-weight: 800;">MJ7 LOGISTICS — {title_summary}</h4>
+                                        <span style="font-size: 12px; color: #475569;">{subtitle_summary}</span>
+                                    </div>
+                                    {logo_html_tag}
+                                </div>
+                                <div style="background-color: #FFFFFF; border: 1px solid #CBD5E1; border-radius: 6px; padding: 10px 14px; font-size: 13px; color: #334155; margin-bottom: 20px;">
+                                    <span style="color: #64748B; font-weight: 600;">DRIVER ID:</span> <span style="font-weight: 700; color: #0F172A;">{d_id}</span> | 
+                                    <span style="color: #64748B; font-weight: 600;">NAME:</span> <span style="font-weight: 700; color: #0F172A;">{d_name}</span>
+                                </div>
+                                <table style="width: 100%; border-collapse: separate; border-spacing: 16px 0; margin-left: -16px; margin-right: -16px;">
+                                    <tr>
+                                        <td style="width: 33.33%; background-color: #FFFFFF; border: 1px solid #CBD5E1; border-radius: 8px; padding: 14px; text-align: center;">
+                                            <div style="font-size: 11px; text-transform: uppercase; color: #475569; font-weight: 700;">Gross Total</div>
+                                            <div style="font-size: 22px; color: #0F172A; font-weight: 800;">{money(total_gross)}</div>
+                                        </td>
+                                        <td style="width: 33.33%; background-color: #FFFFFF; border: 1px solid #CBD5E1; border-radius: 8px; padding: 14px; text-align: center;">
+                                            <div style="font-size: 11px; text-transform: uppercase; color: #475569; font-weight: 700;">Total Owner Pay</div>
+                                            <div style="font-size: 22px; color: #0F172A; font-weight: 800;">{money(total_owner)}</div>
+                                        </td>
+                                        <td style="width: 33.33%; background-color: #2563EB; border: 1px solid #1D4ED8; border-radius: 8px; padding: 14px; text-align: center;">
+                                            <div style="font-size: 11px; text-transform: uppercase; color: #FFFFFF; font-weight: 700;">Total Net Profit</div>
+                                            <div style="font-size: 22px; color: #FFFFFF; font-weight: 800;">{money(total_net)}</div>
+                                        </td>
+                                    </tr>
+                                </table>
+                            </div>
+                            """
+                            st.markdown(summary_html, unsafe_allow_html=True)
+                            
+                            summary_pdf_data = generate_reportlab_pdf(
+                                title_summary, d_id, d_name, card_date_str,
+                                total_gross, total_owner, total_net
+                            )
+                            st.download_button(
+                                label=f"Export {title_summary.title()} Summary (PDF)",
+                                data=summary_pdf_data,
+                                file_name=f"MJ7_{title_summary}_{d_id}.pdf",
+                                mime="application/pdf",
+                                key=f"btn_pdf_total_{d_id}"
+                            )
+                        
+                        st.markdown("<hr style='border: 1px dashed #E2E8F0;'>", unsafe_allow_html=True)
+            else:
+                st.info("ℹ️ No data available for this selection.")
+        else:
+            st.warning("No data found for the selected date.")
+
+# ====================================
+# TAB 3: DEDUCTIONS
+# ====================================
+
+with tabs[3]:
+    st.subheader("Expenses & Deductions Log")
+    display_deductions = deductions.copy()
+    
+    qty_col = get_col("DEDUCTIONS", "qty_gallons")
+    if qty_col in display_deductions.columns:
+        display_deductions[qty_col] = safe_to_numeric(display_deductions[qty_col], errors='coerce')
+        display_deductions[qty_col] = display_deductions[qty_col].apply(format_gallons)
+    
+    st.dataframe(display_deductions, use_container_width=True)
+
+# ====================================
+# TAB 4: DATA ENTRY (OPERATIONS)
+# ====================================
+
+with tabs[4]:
+    st.subheader("Operations Management Module")
+    flow = st.radio(
+        "Select Action:",
+        ["New Load", "Settle Load", "Modify / Re-Settle Load", "Register Deduction", "Add Driver"],
+        horizontal=True
+    )
+    st.divider()
+    
+    # ============ NEW LOAD ============
+    if flow == "New Load":
+        col_x, col_y = st.columns(2)
+        with col_x:
+            l_num = st.text_input("Load Reference ID", value=st.session_state.form_load, placeholder="MJ7-XXXX")
+            l_comp = st.text_input("Broker / Client Name", value=st.session_state.form_company)
+            l_amt = st.number_input("Gross Amount ($)", value=st.session_state.form_amount or 0.0, format="%.2f", step=1.00)
+            l_stat = st.selectbox("Status", ["PENDING", "IN TRANSIT", "DELIVERED", "CLOSED / SETTLED"])
+        with col_y:
+            l_orig = st.text_input("Origin", value=st.session_state.form_origin)
+            l_dest = st.text_input("Destination", value=st.session_state.form_destination)
+            driver_col_real = get_col("DRIVERS", "driver_id")
+            d_options = ["Select Driver"] + sorted_unique_safe(drivers[driver_col_real]) if not drivers.empty else ["No drivers available"]
+            l_driver = st.selectbox("Driver", d_options)
+            l_sdate = st.date_input("Start Date", today)
+            l_edate = st.date_input("Delivery Date", today)
+        
+        if st.button("Save Load"):
+            # ✅ Validar con función
+            is_valid, error = validate_load_data(l_num, l_comp, l_amt, l_driver)
+            if not is_valid:
+                st.error(f"❌ {error}")
+            else:
+                load_id_col = get_col("CARGAS", "load_id")
+                company_col = get_col("CARGAS", "company")
+                amount_col = get_col("CARGAS", "amount")
+                start_date_col = get_col("CARGAS", "start_date")
+                delivery_date_col = get_col("CARGAS", "delivery_date")
+                status_col = get_col("CARGAS", "status")
+                origin_col = get_col("CARGAS", "origin")
+                destination_col = get_col("CARGAS", "destination")
+                driver_id_col = get_col("CARGAS", "driver_id")
+                
+                new_row = [l_num, l_comp, safe_float(l_amt), str(l_sdate), str(l_edate), l_stat, l_orig, l_dest, l_driver]
+                get_ws("CARGAS").append_row(new_row)
+                st.success("✅ Load registered successfully!")
+                st.cache_data.clear()
+    
+    # ============ SETTLE LOAD ============
+    elif flow == "Settle Load":
+        load_id_col = get_col("CARGAS", "load_id")
+        status_col = get_col("CARGAS", "status")
+        amount_col = get_col("CARGAS", "amount")
+        driver_col = get_col("CARGAS", "driver_id")
+        company_col = get_col("CARGAS", "company")
+        
+        active_loads = loads[loads[status_col] != "CLOSED / SETTLED"][load_id_col].astype(str).unique()
+        active_codes = ["Select Load"] + sorted(active_loads.tolist()) if len(active_loads) > 0 else ["No logs open"]
+        chosen_load = st.selectbox("Select Load to Settle:", active_codes)
+        
+        if chosen_load not in ["Select Load", "No logs open"]:
+            # ✅ Usar find_row_by_column (SEGURO)
+            ops = SheetsOperations(client, SHEET_NAME)
+            match = ops.find_row_by_column(loads, "CARGAS", "load_id", chosen_load)
+            
+            if match is not None:
+                op_assigned = match[driver_col]
+                gross_revenue = safe_float(match[amount_col])
+                
+                # Deductions
+                load_num_col = get_col("DEDUCTIONS", "load_id")
+                ded_type_col = get_col("DEDUCTIONS", "type")
+                ded_amt_col = get_col("DEDUCTIONS", "amount")
+                
+                associated_costs = deductions[deductions[load_num_col].astype(str) == chosen_load]
+                fuel_deductions = safe_float(associated_costs[associated_costs[ded_type_col] == "FUEL"][ded_amt_col].sum())
+                other_deductions = safe_float(associated_costs[associated_costs[ded_type_col] == "OTHER"][ded_amt_col].sum())
+                
+                # ✅ Usar calculate_settlement (centralizado)
+                aplicar_factoring = st.checkbox("Apply Factoring Fee (2.15%) to this load?", value=True)
+                settlement = calculate_settlement(
+                    gross_revenue=gross_revenue,
+                    fuel_deductions=fuel_deductions,
+                    other_deductions=other_deductions,
+                    apply_factoring=aplicar_factoring
+                )
+                
+                # ✅ Validar
+                error = validate_settlement(settlement)
+                if error:
+                    st.error(f"❌ Settlement error: {error}")
+                else:
+                    # ✅ Renderizar preview (reutilizable)
+                    st.markdown(render_settlement_preview(settlement), unsafe_allow_html=True)
+                    
+                    st.write("")
+                    if not associated_costs.empty:
+                        st.markdown("### Linked Deductions Breakdown")
+                        ded_concept_col = get_col("DEDUCTIONS", "concept")
+                        df_view = associated_costs[[ded_type_col, ded_concept_col, ded_amt_col]].copy()
+                        df_view.columns = ["Category", "Description", "Amount ($)"]
+                        st.dataframe(df_view, use_container_width=True, hide_index=True)
+                    else:
+                        st.caption("No deductions found for this load.")
+                    
+                    st.divider()
+                    
+                    if st.button("Authorize Settlement", use_container_width=True):
+                        ws_settlements = get_ws("SETTLEMENTS")
+                        settle_load_col = get_col("SETTLEMENTS", "load_id")
+                        
+                        # Verificar que no esté ya liquidada
+                        existing_settlements = ws_settlements.col_values(list(ws_settlements.row_values(1)).index(settle_load_col) + 1) if settle_load_col in ws_settlements.row_values(1) else []
+                        
+                        if chosen_load in [str(x) for x in existing_settlements]:
+                            st.error("❌ This load has already been settled.")
+                        else:
+                            # ✅ Añadir settlement
+                            l_date = datetime.now().strftime('%Y-%m-%d')
+                            settle_date_col = get_col("SETTLEMENTS", "date")
+                            settle_driver_col = get_col("SETTLEMENTS", "driver_id")
+                            settle_gross_col = get_col("SETTLEMENTS", "gross")
+                            settle_owner_col = get_col("SETTLEMENTS", "owner_pay")
+                            settle_dispatch_col = get_col("SETTLEMENTS", "dispatch_fee")
+                            settle_factoring_col = get_col("SETTLEMENTS", "factoring_fee")
+                            settle_mj7_col = get_col("SETTLEMENTS", "mj7_net")
+                            
+                            new_settlement = [
+                                l_date,
+                                chosen_load,
+                                str(op_assigned),
+                                settlement.gross_revenue,
+                                settlement.owner_final,
+                                settlement.dispatch_fee,
+                                settlement.factoring_fee,
+                                settlement.mj7_final
+                            ]
+                            ws_settlements.append_row(new_settlement)
+                            
+                            # ✅ Actualizar status (SEGURO)
+                            ws_loads = get_ws("CARGAS")
+                            ops.update_cell_by_column(
+                                ws=ws_loads,
+                                df=loads,
+                                sheet_name="CARGAS",
+                                search_col="load_id",
+                                search_value=chosen_load,
+                                update_col="status",
+                                new_value="CLOSED / SETTLED"
+                            )
+                            
+                            st.success("✅ Settlement locked and saved!")
+                            st.cache_data.clear()
+            else:
+                st.error("❌ Load not found.")
+    
+    # ============ MODIFY / RE-SETTLE ============
+    elif flow == "Modify / Re-Settle Load":
+        load_id_col = get_col("CARGAS", "load_id")
+        status_col = get_col("CARGAS", "status")
+        amount_col = get_col("CARGAS", "amount")
+        driver_col = get_col("CARGAS", "driver_id")
+        company_col = get_col("CARGAS", "company")
+        driver_col_real = get_col("DRIVERS", "driver_id")
+        
+        all_loads = ["Select Load"] + sorted(loads[load_id_col].astype(str).unique().tolist()) if not loads.empty else []
+        edit_load_id = st.selectbox("Select load to modify:", all_loads)
+        
+        if edit_load_id and edit_load_id != "Select Load":
+            ops = SheetsOperations(client, SHEET_NAME)
+            load_match = ops.find_row_by_column(loads, "CARGAS", "load_id", edit_load_id)
+            
+            if load_match is not None:
+                e_comp = st.text_input("Broker / Client Name", value=load_match[company_col])
+                e_amt = st.number_input("Gross Amount ($)", value=safe_float(load_match[amount_col]), format="%.2f")
+                e_stat = st.selectbox("Status", ["PENDING", "IN TRANSIT", "DELIVERED", "CLOSED / SETTLED"],
+                                     index=["PENDING", "IN TRANSIT", "DELIVERED", "CLOSED / SETTLED"].index(load_match[status_col]))
+                
+                driver_options = sorted_unique_safe(drivers[driver_col_real])
+                e_driver = st.selectbox("Driver", driver_options, index=driver_options.index(str(load_match[driver_col])) if str(load_match[driver_col]) in driver_options else 0)
+                
+                if st.button("Update Load"):
+                    ws_loads = get_ws("CARGAS")
+                    ops.update_cell_by_column(
+                        ws=ws_loads,
+                        df=loads,
+                        sheet_name="CARGAS",
+                        search_col="load_id",
+                        search_value=edit_load_id,
+                        update_col="company",
+                        new_value=e_comp
+                    )
+                    ops.update_cell_by_column(
+                        ws=ws_loads,
+                        df=loads,
+                        sheet_name="CARGAS",
+                        search_col="load_id",
+                        search_value=edit_load_id,
+                        update_col="amount",
+                        new_value=safe_float(e_amt)
+                    )
+                    ops.update_cell_by_column(
+                        ws=ws_loads,
+                        df=loads,
+                        sheet_name="CARGAS",
+                        search_col="load_id",
+                        search_value=edit_load_id,
+                        update_col="status",
+                        new_value=e_stat
+                    )
+                    ops.update_cell_by_column(
+                        ws=ws_loads,
+                        df=loads,
+                        sheet_name="CARGAS",
+                        search_col="load_id",
+                        search_value=edit_load_id,
+                        update_col="driver_id",
+                        new_value=e_driver
+                    )
+                    st.success("✅ Load updated!")
+                    st.cache_data.clear()
+    
+    # ============ REGISTER DEDUCTION ============
+    elif flow == "Register Deduction":
+        driver_col_real = get_col("DRIVERS", "driver_id")
+        load_id_col = get_col("CARGAS", "load_id")
+        driver_pool = sorted_unique_safe(drivers[driver_col_real]) if not drivers.empty else []
+        selected_driver = st.selectbox("Filter by Driver:", ["Select Driver"] + driver_pool)
+        
+        if selected_driver != "Select Driver":
+            carga_driver_col = get_col("CARGAS", "driver_id")
+            allowed_loads = loads[loads[carga_driver_col].astype(str) == selected_driver][load_id_col].astype(str).unique()
+            
+            if len(allowed_loads) > 0:
+                with st.form("deductions_entry_form", clear_on_submit=True):
+                    g1, g2 = st.columns(2)
+                    with g1:
+                        d_fdate = st.date_input("Date", today)
+                        d_cload = st.selectbox("Link to Load", allowed_loads)
+                        d_clog = st.selectbox("Category", ["FUEL", "OTHER"])
+                        d_desc = st.text_input("Memo")
+                    with g2:
+                        d_gal = st.number_input("Gallons", min_value=0.0, step=0.01) if d_clog == "FUEL" else 0.0
+                        d_vcost = st.number_input("Total Amount ($)", min_value=0.0, step=1.00, format="%.2f")
+                    
+                    if st.form_submit_button("Save Deduction"):
+                        ded_date_col = get_col("DEDUCTIONS", "date")
+                        ded_load_col = get_col("DEDUCTIONS", "load_id")
+                        ded_driver_col = get_col("DEDUCTIONS", "driver_id")
+                        ded_type_col = get_col("DEDUCTIONS", "type")
+                        ded_concept_col = get_col("DEDUCTIONS", "concept")
+                        ded_qty_col = get_col("DEDUCTIONS", "qty_gallons")
+                        ded_posted_col = get_col("DEDUCTIONS", "posted_date")
+                        ded_amount_col = get_col("DEDUCTIONS", "amount")
+                        
+                        new_ded = [
+                            str(d_fdate),
+                            d_cload,
+                            selected_driver,
+                            d_clog,
+                            d_desc,
+                            safe_float(d_gal),
+                            str(today),
+                            safe_float(d_vcost)
+                        ]
+                        get_ws("DEDUCTIONS").append_row(new_ded)
+                        st.success("✅ Deduction saved!")
+                        st.cache_data.clear()
+                
+                st.write("")
+                st.markdown("### Existing Deductions for This Driver")
+                ded_driver_col = get_col("DEDUCTIONS", "driver_id")
+                ded_date_col = get_col("DEDUCTIONS", "date")
+                ded_load_col = get_col("DEDUCTIONS", "load_id")
+                ded_type_col = get_col("DEDUCTIONS", "type")
+                ded_concept_col = get_col("DEDUCTIONS", "concept")
+                ded_amount_col = get_col("DEDUCTIONS", "amount")
+                
+                current_driver_deds = deductions[deductions[ded_driver_col].astype(str) == selected_driver]
+                if not current_driver_deds.empty:
+                    df_view = current_driver_deds[[
+                        ded_date_col,
+                        ded_load_col,
+                        ded_type_col,
+                        ded_concept_col,
+                        ded_amount_col
+                    ]].copy()
+                    df_view.columns = ["Date", "Load ID", "Type", "Concept", "Amount ($)"]
+                    st.dataframe(df_view, use_container_width=True, hide_index=True)
+                else:
+                    st.caption("No deductions yet.")
+    
+    # ============ ADD DRIVER ============
+    elif flow == "Add Driver":
+        with st.form("driver_addition_form", clear_on_submit=True):
+            f1, f2 = st.columns(2)
+            with f1:
+                new_id = st.text_input("Driver ID", placeholder="DRV-XX")
+                new_name = st.text_input("Full Name")
+            with f2:
+                new_phone = st.text_input("Phone Number")
+                new_ops = st.selectbox("Operational Status", ["ACTIVE", "ON LEAVE", "INACTIVE"])
+            
+            if st.form_submit_button("Save Driver"):
+                if not new_id or not new_name:
+                    st.error("❌ Driver ID and Full Name are required.")
+                else:
+                    new_d = [new_id, new_name, new_phone, new_ops, str(today)]
+                    get_ws("DRIVERS").append_row(new_d)
+                    st.success("✅ Driver registered!")
+                    st.cache_data.clear()
+
+# ====================================
+# TAB 5: SEARCH ENGINE
+# ====================================
+
+with tabs[5]:
+    st.subheader("Dynamic Search Engine")
+    st.caption("Search across registries by load or driver.")
+    st.markdown("---")
+    
+    col_search_type, col_search_input = st.columns([1, 2])
+    
+    load_id_col = get_col("CARGAS", "load_id")
+    driver_col = get_col("CARGAS", "driver_id")
+    
+    with col_search_type:
+        search_mode = st.radio("Search By:", ["Load ID", "Driver ID"], horizontal=False)
+    
+    with col_search_input:
+        if search_mode == "Load ID":
+            query_string = st.text_input("Enter Load ID:", placeholder="e.g., 4052")
+            filtered_results = loads[loads[load_id_col].astype(str).str.contains(query_string, case=False)] if query_string else loads
+        else:
+            driver_list = ["Select Driver"] + sorted_unique_safe(loads[driver_col])
+            selected_driver = st.selectbox("Select Driver:", driver_list)
+            filtered_results = loads[loads[driver_col].astype(str) == selected_driver] if selected_driver != "Select Driver" else loads
+    
+    st.markdown("---")
+    st.markdown(f"**Records Found:** `{len(filtered_results)}` entries")
+    
+    if len(filtered_results) > 0:
+        st.dataframe(filtered_results, use_container_width=True)
+    else:
+        st.warning("⚠️ No results found.")
 
 # ====================================
 # TAB 6: PDF REPORTS
@@ -445,6 +1106,7 @@ with tabs[6]:
         
         df_display = df_source.copy()
         
+        # Merge con drivers si aplica
         if get_col("SETTLEMENTS", "driver_id") in df_display.columns:
             drivers_copy = drivers[[get_col("DRIVERS", "driver_id"), get_col("DRIVERS", "full_name")]].copy()
             drivers_copy[get_col("DRIVERS", "driver_id")] = drivers_copy[get_col("DRIVERS", "driver_id")].astype(str)
@@ -461,6 +1123,7 @@ with tabs[6]:
             elements_list.append(Paragraph(f"TOTAL MJ7 NET: ${sum_mj7:,.2f} | TOTAL OWNER: ${sum_owner:,.2f}", total_style))
             elements_list.append(Spacer(1, 10))
         
+        # Tabla
         cols = df_display.columns.to_list()
         table_data = [[Paragraph(f"<b>{str(c).replace('_', ' ')}</b>", text_styles['Normal']) for c in cols]]
         
@@ -505,7 +1168,8 @@ with tabs[6]:
                 st.warning("⚠️ No settlement data available.")
     
     elif selected_scope == "Isolated Driver View":
-        driver_uid = st.selectbox("Select Driver:", drivers[get_col("DRIVERS", "driver_id")].unique() if not drivers.empty else [])
+        driver_col_real = get_col("DRIVERS", "driver_id")
+        driver_uid = st.selectbox("Select Driver:", drivers[driver_col_real].unique() if not drivers.empty else [])
         if st.button("Generate Driver Report"):
             settle_driver_col = get_col("SETTLEMENTS", "driver_id")
             subset = settlements[settlements[settle_driver_col].astype(str) == str(driver_uid)]
@@ -932,7 +1596,7 @@ with tabs[9]:
             st.progress(min(1.0, pct / 100))
 
 # ====================================
-# TAB 10: DISPATCH TRACKER - ✅ CORREGIDO
+# TAB 10: DISPATCH TRACKER
 # ====================================
 
 with tabs[10]:
@@ -1013,10 +1677,9 @@ with tabs[10]:
     
     if not dispatch_track.empty:
         disp_date_col = get_col("DISPATCH_TRACKER", "date")
-        st.dataframe(dispatch_track.sort_values(disp_date_col, ascending=False), width='stretch')
+        st.dataframe(dispatch_track.sort_values(disp_date_col, ascending=False), use_container_width=True)
     else:
         st.info("ℹ️ No history.")
-
 
 # ====================================
 # TAB 11: ACCOUNTS PAYABLE / RECEIVABLE
@@ -1144,7 +1807,7 @@ with tabs[11]:
             
             st.dataframe(
                 ap_display[available_cols],
-                width='stretch',
+                use_container_width=True,
                 hide_index=True
             )
             
@@ -1212,7 +1875,7 @@ with tabs[11]:
                 aged_summary.columns = ['Total Amount', 'Count']
                 aged_summary['Total Amount'] = aged_summary['Total Amount'].apply(money)
                 
-                st.dataframe(aged_summary, width='stretch')
+                st.dataframe(aged_summary, use_container_width=True)
             else:
                 st.info("ℹ️ No overdue payables.")
         else:
@@ -1301,7 +1964,7 @@ with tabs[11]:
             
             st.dataframe(
                 ar_display[available_cols],
-                width='stretch',
+                use_container_width=True,
                 hide_index=True
             )
             
@@ -1369,7 +2032,7 @@ with tabs[11]:
                 aged_summary.columns = ['Total Amount', 'Count']
                 aged_summary['Total Amount'] = aged_summary['Total Amount'].apply(money)
                 
-                st.dataframe(aged_summary, width='stretch')
+                st.dataframe(aged_summary, use_container_width=True)
             else:
                 st.info("ℹ️ No overdue receivables.")
         else:
