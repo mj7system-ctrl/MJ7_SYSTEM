@@ -1,12 +1,14 @@
 """
 Accounts Payable / Accounts Receivable business logic.
-Completely independent from settlements.
+Completely independent from settlements module.
+Handles invoices, aging reports, and payment tracking.
 """
 
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 import pandas as pd
-from utils.helpers import safe_float, safe_date_str
+from utils.helpers import safe_float
+
 
 @dataclass
 class APARMetrics:
@@ -22,36 +24,54 @@ class APARMetrics:
     count_overdue: int
     count_due_soon: int
 
+
 def calculate_ap_ar_metrics(df, today=None):
     """
     Calculate AP/AR metrics from dataframe.
     
     Args:
-        df: DataFrame with AP/AR data
+        df: DataFrame with AP/AR data (must have AMOUNT, STATUS, DUE_DATE columns)
         today: Reference date (default: today)
     
     Returns:
-        APARMetrics object
+        APARMetrics object with all calculations
     """
     if today is None:
         today = pd.Timestamp.today().normalize()
     
     if df.empty:
+        return APARMetrics(
+            total_amount=0,
+            paid_amount=0,
+            pending_amount=0,
+            overdue_amount=0,
+            due_soon_amount=0,
+            count_total=0,
+            count_paid=0,
+            count_pending=0,
+            count_overdue=0,
+            count_due_soon=0
+        )
+    
+    # Make a copy and ensure correct data types
+    df_clean = df.copy()
+    
+    # Convert AMOUNT to numeric
+    if 'AMOUNT' in df_clean.columns:
+        df_clean['AMOUNT'] = pd.to_numeric(df_clean['AMOUNT'], errors='coerce').fillna(0)
+    else:
         return APARMetrics(0, 0, 0, 0, 0, 0, 0, 0, 0, 0)
     
-    # Ensure date columns are datetime
-    if 'DUE_DATE' in df.columns:
-        df['DUE_DATE'] = pd.to_datetime(df['DUE_DATE'], errors='coerce')
+    # Convert DUE_DATE to datetime
+    if 'DUE_DATE' in df_clean.columns:
+        df_clean['DUE_DATE'] = pd.to_datetime(df_clean['DUE_DATE'], errors='coerce')
     
-    # Calculate amounts
-    df_clean = df.copy()
-    df_clean['AMOUNT'] = pd.to_numeric(df_clean['AMOUNT'], errors='coerce').fillna(0)
-    
+    # Calculate total amounts
     total_amount = safe_float(df_clean['AMOUNT'].sum())
     
     # Status breakdown
-    paid_mask = df_clean['STATUS'] == 'PAID'
-    pending_mask = df_clean['STATUS'] == 'PENDING'
+    paid_mask = df_clean.get('STATUS', '') == 'PAID'
+    pending_mask = df_clean.get('STATUS', '') == 'PENDING'
     
     paid_amount = safe_float(df_clean[paid_mask]['AMOUNT'].sum())
     pending_amount = safe_float(df_clean[pending_mask]['AMOUNT'].sum())
@@ -77,11 +97,18 @@ def calculate_ap_ar_metrics(df, today=None):
         count_due_soon=len(df_clean[due_soon_mask])
     )
 
+
 def get_aged_report(df, today=None):
     """
     Generate aged debtors/creditors report.
+    Buckets outstanding invoices by days overdue.
     
-    Returns dataframe with aging buckets.
+    Args:
+        df: DataFrame with AP/AR data
+        today: Reference date (default: today)
+    
+    Returns:
+        DataFrame with aging buckets
     """
     if today is None:
         today = pd.Timestamp.today().normalize()
@@ -90,17 +117,29 @@ def get_aged_report(df, today=None):
         return pd.DataFrame()
     
     df_report = df.copy()
-    df_report['AMOUNT'] = pd.to_numeric(df_report['AMOUNT'], errors='coerce').fillna(0)
-    df_report['DUE_DATE'] = pd.to_datetime(df_report['DUE_DATE'], errors='coerce')
+    
+    # Clean data
+    if 'AMOUNT' in df_report.columns:
+        df_report['AMOUNT'] = pd.to_numeric(df_report['AMOUNT'], errors='coerce').fillna(0)
+    
+    if 'DUE_DATE' in df_report.columns:
+        df_report['DUE_DATE'] = pd.to_datetime(df_report['DUE_DATE'], errors='coerce')
     
     # Only PENDING records
-    df_report = df_report[df_report['STATUS'] == 'PENDING']
+    if 'STATUS' in df_report.columns:
+        df_report = df_report[df_report['STATUS'] == 'PENDING']
+    
+    if df_report.empty:
+        return pd.DataFrame()
     
     # Calculate days overdue
     df_report['DAYS_OVERDUE'] = (today - df_report['DUE_DATE']).dt.days
     
-    # Aging buckets
+    # Aging bucket function
     def get_bucket(days):
+        """Classify invoice age into buckets."""
+        if pd.isna(days):
+            return "Unknown"
         if days < 0:
             return "Not Yet Due"
         elif days <= 30:
@@ -116,9 +155,10 @@ def get_aged_report(df, today=None):
     
     return df_report
 
+
 def mark_payment(df, record_id, payment_date):
     """
-    Mark a record as PAID.
+    Mark a record as PAID in memory (not persisted).
     
     Args:
         df: DataFrame
@@ -129,10 +169,12 @@ def mark_payment(df, record_id, payment_date):
         Updated DataFrame
     """
     df_updated = df.copy()
-    mask = df_updated['ID'] == record_id
     
-    if mask.any():
-        df_updated.loc[mask, 'STATUS'] = 'PAID'
-        df_updated.loc[mask, 'PAYMENT_DATE'] = payment_date
+    if 'ID' in df_updated.columns:
+        mask = df_updated['ID'] == record_id
+        
+        if mask.any():
+            df_updated.loc[mask, 'STATUS'] = 'PAID'
+            df_updated.loc[mask, 'PAYMENT_DATE'] = str(payment_date)
     
     return df_updated
