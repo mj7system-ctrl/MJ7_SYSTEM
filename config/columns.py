@@ -1,11 +1,12 @@
 """
 Column mapping configuration for all sheets.
-Maps logical names to actual column headers.
+Maps logical names to actual column headers in Google Sheets.
+UPDATED: Aligned with actual Google Sheets column names
 """
 
 COLUMN_MAPS = {
     "CARGAS": {
-        "load_id": "LOAD_ID",
+        "load_id": "LOAD",
         "company": "COMPANY",
         "amount": "AMOUNT",
         "start_date": "START_DATE",
@@ -17,22 +18,22 @@ COLUMN_MAPS = {
     },
     "SETTLEMENTS": {
         "date": "DATE",
-        "load_id": "LOAD_ID",
+        "load_id": "LOAD_NUMBER",
         "driver_id": "DRIVER_ID",
-        "gross": "GROSS_AMOUNT",
+        "gross": "GROSS",
         "owner_pay": "OWNER_PAY",
-        "dispatch_fee": "DISPATCH_FEE",
-        "factoring_fee": "FACTORING_FEE",
+        "dispatch_fee": "DISPATCH",
+        "factoring_fee": "FACTORING",
         "mj7_net": "MJ7_NET",
     },
     "DEDUCTIONS": {
         "date": "DATE",
-        "load_id": "LOAD_ID",
+        "load_id": "LOAD_NUMBER",
         "driver_id": "DRIVER_ID",
         "type": "TYPE",
         "concept": "CONCEPT",
         "qty_gallons": "QTY_GALLONS",
-        "posted_date": "POSTED_DATE",
+        "fuel_date": "FUEL_DATE",
         "amount": "AMOUNT",
     },
     "DRIVERS": {
@@ -40,9 +41,9 @@ COLUMN_MAPS = {
         "full_name": "FULL_NAME",
         "phone": "PHONE",
         "status": "STATUS",
-        "hire_date": "HIRE_DATE",
+        "registration_date": "REGISTRATION_DATE",
     },
-    "EXPENSE_FINANCIAMIENTOS": {
+    "EXPENSE_FINANCING": {
         "id_fin": "ID_FIN",
         "driver": "DRIVER",
         "truck_id": "TRUCK_ID",
@@ -64,9 +65,10 @@ COLUMN_MAPS = {
     },
     "DISPATCH_TRACKER": {
         "date": "DATE",
-        "person": "PERSON",
+        "month": "MONTH",
         "concept": "CONCEPT",
         "amount": "AMOUNT",
+        "type": "TYPE",
     },
     # AP/AR MAPPINGS - MJ7
     "AP_MJ7": {
@@ -119,10 +121,21 @@ COLUMN_MAPS = {
     },
 }
 
+
 def get_col(sheet_name, logical_name):
     """
     Get the actual column name from logical name.
     Returns the column header string.
+    
+    Args:
+        sheet_name (str): Name of the sheet
+        logical_name (str): Logical column identifier
+    
+    Returns:
+        str: Actual column header name
+    
+    Raises:
+        ValueError: If sheet or logical name not found
     """
     if sheet_name not in COLUMN_MAPS:
         raise ValueError(f"Sheet '{sheet_name}' not found in COLUMN_MAPS")
@@ -132,10 +145,17 @@ def get_col(sheet_name, logical_name):
     
     return COLUMN_MAPS[sheet_name][logical_name]
 
+
 def validate_sheet_columns(df, sheet_name):
     """
     Validate that a dataframe has all required columns for a sheet.
-    Returns (is_valid, error_message)
+    
+    Args:
+        df (pd.DataFrame): Dataframe to validate
+        sheet_name (str): Name of the sheet to validate against
+    
+    Returns:
+        tuple: (is_valid, error_message)
     """
     if df.empty:
         return True, None
@@ -144,6 +164,22 @@ def validate_sheet_columns(df, sheet_name):
     missing_cols = [col for col in required_cols if col not in df.columns]
     
     if missing_cols:
-        return False, f"Missing columns: {', '.join(missing_cols)}"
+        return False, f"Missing columns in '{sheet_name}': {', '.join(missing_cols)}"
     
     return True, None
+
+
+def get_all_column_names(sheet_name):
+    """
+    Get all actual column names for a sheet.
+    
+    Args:
+        sheet_name (str): Name of the sheet
+    
+    Returns:
+        list: List of actual column names
+    """
+    if sheet_name not in COLUMN_MAPS:
+        raise ValueError(f"Sheet '{sheet_name}' not found in COLUMN_MAPS")
+    
+    return list(COLUMN_MAPS[sheet_name].values())
