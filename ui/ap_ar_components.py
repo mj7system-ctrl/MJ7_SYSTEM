@@ -1,12 +1,23 @@
 """
 UI components for AP/AR module.
+Renders headers, metrics grids, and data rows.
 """
 
 from utils.helpers import money
 from business.ap_ar_logic import APARMetrics
 
+
 def render_ap_ar_header(company_name, is_payable=True):
-    """Render AP/AR section header."""
+    """
+    Render AP/AR section header.
+    
+    Args:
+        company_name: Name of company (e.g., "MJ7 LOGISTICS")
+        is_payable: True for Accounts Payable, False for Receivable
+    
+    Returns:
+        HTML string for header
+    """
     section_type = "ACCOUNTS PAYABLE" if is_payable else "ACCOUNTS RECEIVABLE"
     
     header = f"""
@@ -17,8 +28,18 @@ def render_ap_ar_header(company_name, is_payable=True):
     """
     return header
 
+
 def render_metrics_grid(metrics: APARMetrics):
-    """Render AP/AR metrics dashboard."""
+    """
+    Render AP/AR metrics dashboard.
+    Displays 5-column grid with key metrics.
+    
+    Args:
+        metrics: APARMetrics object with calculated values
+    
+    Returns:
+        HTML string for metrics grid
+    """
     
     grid = f"""
     <div style="display: grid; grid-template-columns: repeat(5, 1fr); gap: 15px; margin-bottom: 25px;">
@@ -55,8 +76,25 @@ def render_metrics_grid(metrics: APARMetrics):
     """
     return grid
 
-def render_ap_ar_row(row_id, date, supplier_or_client, invoice_num, description, amount, due_date, status, payment_date):
-    """Render a single AP/AR record row for display."""
+
+def render_ap_ar_row(row_id, date, supplier_or_client, invoice_num, description, amount, due_date, status, payment_date=""):
+    """
+    Render a single AP/AR record row for display.
+    
+    Args:
+        row_id: Record ID
+        date: Invoice date
+        supplier_or_client: Supplier/Client name
+        invoice_num: Invoice number
+        description: Invoice description
+        amount: Amount in USD
+        due_date: Due date
+        status: PAID or PENDING
+        payment_date: Date payment was made (if paid)
+    
+    Returns:
+        HTML string for table row
+    """
     
     status_color = "#10B981" if status == "PAID" else "#F59E0B"
     status_bg = "#F0FDF4" if status == "PAID" else "#FFFBEB"
