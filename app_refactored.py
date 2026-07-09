@@ -1980,9 +1980,9 @@ with tabs[11]:
                     ar_options = []
                     for _, row in pending_ar.iterrows():
                         inv_num = row.get('INVOICE_NUMBER', 'N/A')
-                        client = row.get('CLIENT', 'N/A')
+                        client_name = row.get('CLIENT', 'N/A')
                         amount = money(safe_float(row.get('AMOUNT', 0)))
-                        ar_options.append(f"{inv_num} - {client} - {amount}")
+                        ar_options.append(f"{inv_num} - {client_name} - {amount}")
                     
                     selected_ar = st.selectbox("Select Invoice to Mark Paid:", ar_options, key="select_ar_payment")
                     
@@ -2043,4 +2043,4 @@ with tabs[11]:
 # ====================================
 
 st.divider()
-st.caption("🚛 MJ7 Logistics Control Center v5.0 | Powered by Streamlit + Google Sheets | Last Updated: 2024")
+st.caption("🚛 MJ7 Logistics Control Center v5.0 | Updated June 2026")
