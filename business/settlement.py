@@ -25,18 +25,19 @@ def calculate_settlement(gross_revenue, fuel_deductions=0.0, other_deductions=0.
     Calculate settlement breakdown.
     
     Flow:
-    1. Gross Revenue
-    2. Subtract fuel & other deductions
-    3. Subtract dispatch fee (5%)
-    4. If enabled, subtract factoring fee (2.15%)
-    5. Remainder = Owner final payment
-    6. MJ7 keeps dispatch + factoring
+    1. Calculate Owner Base from 85% of Gross Revenue
+    2. Calculate MJ7 Base from 15% of Gross Revenue
+    3. Calculate Dispatch Fee from 5% of Gross Revenue
+    4. Calculate Factoring Fee from 2.15% of Gross Revenue
+    5. Subtract fuel and other deductions from Owner Base
+    6. If factoring is enabled, charge Factoring Fee to Owner
+    7. If factoring is disabled, charge Factoring Fee to MJ7
     
     Args:
         gross_revenue: Total load amount ($)
         fuel_deductions: Fuel costs ($)
         other_deductions: Other deductions ($)
-        apply_factoring: Whether to apply 2.15% factoring fee
+        apply_factoring: Whether to charge 2.15% factoring fee to Owner
     
     Returns:
         SettlementBreakdown object with all calculations
@@ -48,32 +49,28 @@ def calculate_settlement(gross_revenue, fuel_deductions=0.0, other_deductions=0.
     # Calculate total deductions
     subtotal_deductions = fuel_deductions + other_deductions
     
-    # Calculate dispatch fee (10% of gross)
+    # All percentage-based amounts must be calculated from 100% gross.
+    owner_base = gross_revenue * 0.85
+    mj7_base = gross_revenue * 0.15
     dispatch_fee = gross_revenue * 0.05
-    
-    # Calculate amount before factoring
-    before_factoring = gross_revenue - subtotal_deductions - dispatch_fee
-    
-    # Apply factoring if enabled (2.15% of before_factoring)
-    factoring_fee = 0.0
+    factoring_fee = gross_revenue * 0.0215
+
     if apply_factoring:
-        factoring_fee = before_factoring * 0.0215
-    
-    # Owner gets: before_factoring - factoring_fee
-    owner_final = before_factoring - factoring_fee
-    
-    # MJ7 gets: dispatch_fee + factoring_fee
-    mj7_final = dispatch_fee + factoring_fee
+        owner_final = owner_base - subtotal_deductions - factoring_fee
+        mj7_final = mj7_base - dispatch_fee
+    else:
+        owner_final = owner_base - subtotal_deductions
+        mj7_final = mj7_base - dispatch_fee - factoring_fee
     
     return SettlementBreakdown(
         gross_revenue=gross_revenue,
         fuel_deductions=fuel_deductions,
         other_deductions=other_deductions,
         subtotal_deductions=subtotal_deductions,
-        dispatch_fee=dispatch_fee,
-        factoring_fee=factoring_fee,
-        owner_final=owner_final,
-        mj7_final=mj7_final
+        dispatch_fee=round(dispatch_fee, 2),
+        factoring_fee=round(factoring_fee, 2),
+        owner_final=round(owner_final, 2),
+        mj7_final=round(mj7_final, 2)
     )
 
 
@@ -96,9 +93,18 @@ def validate_settlement(settlement):
     if settlement.mj7_final < 0:
         return "❌ MJ7 net cannot be negative"
     
-    # Verify math: gross - deductions - dispatch - factoring = owner
-    expected_owner = settlement.gross_revenue - settlement.subtotal_deductions - settlement.dispatch_fee - settlement.factoring_fee
-    if abs(settlement.owner_final - expected_owner) > 0.01:  # Allow 1 cent rounding
+    owner_base = settlement.gross_revenue * 0.85
+    mj7_base = settlement.gross_revenue * 0.15
+    expected_total = (
+        settlement.owner_final
+        + settlement.mj7_final
+        + settlement.subtotal_deductions
+        + settlement.dispatch_fee
+        + settlement.factoring_fee
+    )
+    expected_gross_split = owner_base + mj7_base
+
+    if abs(expected_total - expected_gross_split) > 0.05:
         return "❌ Settlement calculation mismatch"
     
     return None
