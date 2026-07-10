@@ -299,7 +299,7 @@ today = pd.Timestamp.today().normalize()
 # CARGAR DATOS (con validación)
 # ====================================
 
-@st.cache_data(ttl=600)
+@st.cache_data(ttl=3600)
 def load_data():
     """Cargar datos de todas las hojas con validación."""
     sh = client.open(SHEET_NAME)
