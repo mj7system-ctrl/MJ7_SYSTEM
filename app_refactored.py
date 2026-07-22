@@ -1208,7 +1208,8 @@ with tabs[7]:
     if not loads.empty:
         load_id_col_name = get_col("CARGAS", "load_id")
         status_col_name = get_col("CARGAS", "status")
-        company_col_name = get_col("CARGAS", "company")
+        # Cambiamos company_col_name por amount_col_name
+        amount_col_name = get_col("CARGAS", "amount")
         driver_col_name = get_col("CARGAS", "driver_id")
         delivery_col_name = get_col("CARGAS", "delivery_date")
         origin_col_name = get_col("CARGAS", "origin")
@@ -1260,7 +1261,7 @@ with tabs[7]:
             st.markdown("<h5 style='color: #0F172A; font-weight: 600; margin-bottom: 15px;'>🔴 Critical Loads</h5>", unsafe_allow_html=True)
             for item, motivo in criticas:
                 load_id = item.get(load_id_col_name, 'N/A')
-                company = item.get(company_col_name, 'N/A')
+                amount = item.get(amount_col_name, 'N/A')
                 driver = item.get(driver_col_name, 'N/A')
                 origin = item.get(origin_col_name, 'N/A')
                 destination = item.get(destination_col_name, 'N/A')
@@ -1268,7 +1269,7 @@ with tabs[7]:
                 st.markdown(f"""
                 <div style="background-color: #FFFFFF; border: 1px solid #E2E8F0; border-left: 5px solid #DC2626; border-radius: 8px; padding: 16px; margin-bottom: 12px;">
                     <div style="display: flex; justify-content: space-between; align-items: center;">
-                        <span style="font-weight: 600; color: #0F172A;">Load: {load_id} | {company}</span>
+                        <span style="font-weight: 600; color: #0F172A;">Load: {load_id} | ${amount}</span>
                         <span style="font-size: 12px; color: #DC2626; background-color: #FEF2F2; padding: 4px 8px; border-radius: 4px;">{motivo}</span>
                     </div>
                     <div style="font-size: 13px; color: #475569; margin-top: 10px; border-top: 1px solid #F1F5F9; padding-top: 10px; display: flex; gap: 15px;">
@@ -1284,7 +1285,7 @@ with tabs[7]:
             st.markdown("<h5 style='color: #0F172A; font-weight: 600; margin-bottom: 15px;'>🟠 Urgent Loads (Due Tomorrow)</h5>", unsafe_allow_html=True)
             for item, motivo in atencion:
                 load_id = item.get(load_id_col_name, 'N/A')
-                company = item.get(company_col_name, 'N/A')
+                amount = item.get(amount_col_name, 'N/A')
                 driver = item.get(driver_col_name, 'N/A')
                 origin = item.get(origin_col_name, 'N/A')
                 destination = item.get(destination_col_name, 'N/A')
@@ -1292,7 +1293,7 @@ with tabs[7]:
                 st.markdown(f"""
                 <div style="background-color: #FFFFFF; border: 1px solid #E2E8F0; border-left: 5px solid #D97706; border-radius: 8px; padding: 16px; margin-bottom: 12px;">
                     <div style="display: flex; justify-content: space-between; align-items: center;">
-                        <span style="font-weight: 600; color: #0F172A;">Load: {load_id} | {company}</span>
+                        <span style="font-weight: 600; color: #0F172A;">Load: {load_id} | ${amount}</span>
                         <span style="font-size: 12px; color: #B45309; background-color: #FEF3C7; padding: 4px 8px; border-radius: 4px;">{motivo}</span>
                     </div>
                     <div style="font-size: 13px; color: #475569; margin-top: 10px; border-top: 1px solid #F1F5F9; padding-top: 10px; display: flex; gap: 15px;">
@@ -1308,7 +1309,7 @@ with tabs[7]:
             st.markdown("<h5 style='color: #0F172A; font-weight: 600; margin-bottom: 15px;'>🔵 Pending Settlement</h5>", unsafe_allow_html=True)
             for item, motivo in entregadas:
                 load_id = item.get(load_id_col_name, 'N/A')
-                company = item.get(company_col_name, 'N/A')
+                amount = item.get(amount_col_name, 'N/A')
                 driver = item.get(driver_col_name, 'N/A')
                 origin = item.get(origin_col_name, 'N/A')
                 destination = item.get(destination_col_name, 'N/A')
@@ -1316,7 +1317,7 @@ with tabs[7]:
                 st.markdown(f"""
                 <div style="background-color: #FFFFFF; border: 1px solid #E2E8F0; border-left: 5px solid #2563EB; border-radius: 8px; padding: 16px; margin-bottom: 12px;">
                     <div style="display: flex; justify-content: space-between; align-items: center;">
-                        <span style="font-weight: 600; color: #0F172A;">Load: {load_id} | {company}</span>
+                        <span style="font-weight: 600; color: #0F172A;">Load: {load_id} | ${amount}</span>
                         <span style="font-size: 12px; color: #1E40AF; background-color: #EFF6FF; padding: 4px 8px; border-radius: 4px;">{motivo}</span>
                     </div>
                     <div style="font-size: 13px; color: #475569; margin-top: 10px; border-top: 1px solid #F1F5F9; padding-top: 10px; display: flex; gap: 15px;">
@@ -1332,12 +1333,12 @@ with tabs[7]:
             st.markdown("<h5 style='color: #0F172A; font-weight: 600; margin-bottom: 15px;'>🟢 On Schedule</h5>", unsafe_allow_html=True)
             for item, motivo in en_tiempo:
                 load_id = item.get(load_id_col_name, 'N/A')
-                company = item.get(company_col_name, 'N/A')
+                amount = item.get(amount_col_name, 'N/A')
                 
                 st.markdown(f"""
                 <div style="background-color: #FFFFFF; border: 1px solid #E2E8F0; border-left: 5px solid #16A34A; border-radius: 8px; padding: 16px; margin-bottom: 12px;">
                     <div style="display: flex; justify-content: space-between; align-items: center;">
-                        <span style="font-weight: 600; color: #0F172A;">Load: {load_id} | {company}</span>
+                        <span style="font-weight: 600; color: #0F172A;">Load: {load_id} | ${amount}</span>
                         <span style="font-size: 12px; color: #15803D; background-color: #DCFCE7; padding: 4px 8px; border-radius: 4px;">{motivo}</span>
                     </div>
                 </div>
