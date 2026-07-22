@@ -57,7 +57,7 @@ def render_settlement_preview(settlement):
 <td style="padding: 10px 0; text-align: right; color: #64748B;">{money(settlement.other_deductions)}</td>
 </tr>
 <tr style="border-bottom: 1px solid #BFDBFE;">
-<td style="padding: 10px 0; color: #64748B;">- Dispatch Fee (10%):</td>
+<td style="padding: 10px 0; color: #64748B;">- Dispatch Fee (5.0%):</td>
 <td style="padding: 10px 0; text-align: right; color: #64748B;">{money(settlement.dispatch_fee)}</td>
 </tr>
 <tr style="border-bottom: 1px solid #BFDBFE;">
